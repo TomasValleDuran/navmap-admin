@@ -34,7 +34,7 @@ export function PlacementController() {
       if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > DRAG_PIXELS) return
       const state = useNavmapStore.getState()
       if (!state.modelLoaded) return
-      if (state.mode !== 'poi' && state.mode !== 'waypoint') return
+      if (state.mode !== 'poi' && state.mode !== 'waypoint' && state.mode !== 'measure') return
 
       const rect = dom.getBoundingClientRect()
       ndc.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
@@ -42,6 +42,25 @@ export function PlacementController() {
       raycaster.current.setFromCamera(ndc.current, camera)
 
       let point: THREE.Vector3 | null = null
+      if (state.mode === 'measure') {
+        const model = scene.getObjectByName('model-group')
+        if (model) {
+          const h = raycaster.current.intersectObjects(model.children, true)
+          if (h.length) point = h[0].point.clone()
+        }
+        if (!point) {
+          state.setStatus('No se encontró un punto en el modelo.')
+          return
+        }
+        state.addMeasurePoint({ vx: point.x, vy: point.y, vz: point.z })
+        const n = useNavmapStore.getState().measurePoints.length
+        state.setStatus(
+          n === 1
+            ? 'Punto A fijado. Click en el segundo punto.'
+            : 'Medición lista. Ingresá la distancia real para calibrar.',
+        )
+        return
+      }
       if (shouldPickFloor()) {
         const floor = scene.getObjectByName('floor-solid')
         if (floor) {

@@ -5,6 +5,7 @@ import { MarkersLayer } from './MarkersLayer'
 import { PlacementController } from './PlacementController'
 import { HoverTracker } from './HoverTracker'
 import { CameraRig } from './CameraRig'
+import { MeasureLayer } from './MeasureLayer'
 
 export function Scene() {
   return (
@@ -23,6 +24,7 @@ export function Scene() {
       <PointCloud />
       <FloorPlane />
       <MarkersLayer />
+      <MeasureLayer />
       <PlacementController />
       <HoverTracker />
       <CameraRig />

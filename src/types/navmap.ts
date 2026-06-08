@@ -1,6 +1,12 @@
 import * as THREE from 'three'
 
-export type Mode = 'view' | 'poi' | 'waypoint' | 'edge' | 'select'
+export type Mode = 'view' | 'poi' | 'waypoint' | 'edge' | 'select' | 'measure'
+
+export interface MeasurePoint {
+  vx: number
+  vy: number
+  vz: number
+}
 
 export type POIType =
   | 'bathroom'
@@ -82,6 +88,7 @@ export interface AnnotationsV2 {
     scale: number
     alignQ: [number, number, number, number] | null
     floorHeightViewer: number
+    metersPerViewerUnit: number | null
   }
   nodes: Array<
     | ({ kind: 'poi' } & POI)

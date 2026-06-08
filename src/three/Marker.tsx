@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useNavmapStore } from '../store/useNavmapStore'
 import {
   colmapToViewer,
+  formatColmapDistance,
   markerDisplayY,
   markerR,
   POI_COLORS,
@@ -56,7 +57,11 @@ export function Marker({ node, nodeType }: Props) {
         s.setStatus('Conexión cancelada.')
       } else {
         const edge = s.addEdge(s.edgeStart, { id: node.id, nodeType })
-        s.setStatus(edge ? `Conexión creada (d=${edge.weight.toFixed(2)}).` : 'Conexión duplicada o inválida.')
+        s.setStatus(
+          edge
+            ? `Conexión creada (d=${formatColmapDistance(edge.weight, s.transform.scale, s.metersPerViewerUnit)}).`
+            : 'Conexión duplicada o inválida.',
+        )
       }
     }
   }

@@ -23,6 +23,7 @@ export function Header() {
       edges: s.edges,
       transform: s.transform,
       floorHeightViewer: s.floorHeightViewer,
+      metersPerViewerUnit: s.metersPerViewerUnit,
     })
     setStatus(`Exportado: ${s.pois.length} POIs · ${s.waypoints.length} WPs · ${s.edges.length} edges.`)
   }
@@ -37,6 +38,7 @@ export function Header() {
         edges: r.edges,
         transform: r.transform,
         floorHeightViewer: r.floorHeightViewer,
+        metersPerViewerUnit: r.metersPerViewerUnit,
       })
       setStatus(
         `Importado (v${r.version}): ${r.pois.length} POIs · ${r.waypoints.length} WPs · ${r.edges.length} edges.`,

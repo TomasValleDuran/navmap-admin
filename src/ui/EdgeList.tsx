@@ -1,4 +1,5 @@
 import { useNavmapStore } from '../store/useNavmapStore'
+import { formatColmapDistance } from '../lib/coordTransforms'
 
 export function EdgeList() {
   const edges = useNavmapStore((s) => s.edges)
@@ -6,6 +7,8 @@ export function EdgeList() {
   const waypoints = useNavmapStore((s) => s.waypoints)
   const deleteEdge = useNavmapStore((s) => s.deleteEdge)
   const setStatus = useNavmapStore((s) => s.setStatus)
+  const scale = useNavmapStore((s) => s.transform.scale)
+  const mpvu = useNavmapStore((s) => s.metersPerViewerUnit)
 
   const labelOf = (id: string, type: 'poi' | 'waypoint'): string => {
     if (type === 'poi') return pois.find((p) => p.id === id)?.name ?? id
@@ -33,7 +36,9 @@ export function EdgeList() {
                 <span className="text-muted"> → </span>
                 <span className="text-text">{labelOf(e.to, e.toType)}</span>
               </div>
-              <span className="font-mono text-[10px] text-muted">{e.weight.toFixed(2)}m</span>
+              <span className="font-mono text-[10px] text-muted">
+                {formatColmapDistance(e.weight, scale, mpvu)}
+              </span>
               <button
                 type="button"
                 onClick={() => {

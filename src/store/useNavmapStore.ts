@@ -6,6 +6,7 @@ import type {
 import type {
   Edge,
   EdgeStart,
+  MeasurePoint,
   Mode,
   NodeType,
   PendingPoint,
@@ -81,7 +82,14 @@ interface NavmapState {
     edges: Edge[]
     transform?: Partial<Transform>
     floorHeightViewer?: number
+    metersPerViewerUnit?: number | null
   }) => void
+
+  measurePoints: MeasurePoint[]
+  metersPerViewerUnit: number | null
+  addMeasurePoint: (p: MeasurePoint) => void
+  clearMeasure: () => void
+  setMetersPerViewerUnit: (v: number | null) => void
 }
 
 const initialTransform: Transform = {
@@ -124,8 +132,23 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
   editingNode: null,
   cameraMode: 'orbit',
   focusRequestId: 0,
+  measurePoints: [],
+  metersPerViewerUnit: null,
 
-  setMode: (mode) => set({ mode, edgeStart: null }),
+  setMode: (mode) =>
+    set((s) => ({
+      mode,
+      edgeStart: null,
+      measurePoints: mode === 'measure' ? s.measurePoints : [],
+    })),
+
+  addMeasurePoint: (p) =>
+    set((s) => {
+      const next = s.measurePoints.length >= 2 ? [p] : [...s.measurePoints, p]
+      return { measurePoints: next }
+    }),
+  clearMeasure: () => set({ measurePoints: [] }),
+  setMetersPerViewerUnit: (metersPerViewerUnit) => set({ metersPerViewerUnit }),
   setPendingPoint: (pendingPoint) => set({ pendingPoint }),
 
   addPOI: ({ name, type, desc, floor }) => {
@@ -220,6 +243,7 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
       selectedNode: null,
       edgeStart: null,
       pendingPoint: null,
+      measurePoints: [],
     }),
 
   setFloorLock: (floorLock) => set({ floorLock }),
@@ -256,7 +280,7 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
   setCameraMode: (cameraMode) => set({ cameraMode }),
   requestFocus: () => set((s) => ({ focusRequestId: s.focusRequestId + 1 })),
 
-  importState: ({ pois, waypoints, edges, transform, floorHeightViewer }) =>
+  importState: ({ pois, waypoints, edges, transform, floorHeightViewer, metersPerViewerUnit }) =>
     set((s) => {
       const nextTransform: Transform = transform
         ? {
@@ -276,9 +300,12 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
         edges,
         transform: nextTransform,
         floorHeightViewer: floorHeightViewer ?? s.floorHeightViewer,
+        metersPerViewerUnit:
+          metersPerViewerUnit !== undefined ? metersPerViewerUnit : s.metersPerViewerUnit,
         selectedNode: null,
         edgeStart: null,
         pendingPoint: null,
+        measurePoints: [],
       }
     }),
 }))

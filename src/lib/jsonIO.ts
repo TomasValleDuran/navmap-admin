@@ -7,6 +7,7 @@ export interface ExportInput {
   edges: Edge[]
   transform: Transform
   floorHeightViewer: number
+  metersPerViewerUnit: number | null
 }
 
 export interface ImportResult {
@@ -15,17 +16,26 @@ export interface ImportResult {
   edges: Edge[]
   transform: Partial<Transform>
   floorHeightViewer?: number
+  metersPerViewerUnit: number | null
   version: '1' | '2.0'
 }
 
 export function exportToJSON(input: ExportInput): string {
-  const { pois, waypoints, edges, transform, floorHeightViewer } = input
+  const { pois, waypoints, edges, transform, floorHeightViewer, metersPerViewerUnit } = input
+  const calibrated =
+    metersPerViewerUnit != null && isFinite(metersPerViewerUnit) && metersPerViewerUnit > 0
+  const metersPerColmapUnit = calibrated ? transform.scale * metersPerViewerUnit : null
+  const scaleM = metersPerColmapUnit ?? 0
+  const toMetersScalar = (v: number) => (calibrated ? v * scaleM : null)
+  const toMetersPos = (x: number, y: number, z: number) =>
+    calibrated ? { x: x * scaleM, y: y * scaleM, z: z * scaleM } : null
+
   const data = {
     version: '2.0' as const,
     exported_at: new Date().toISOString(),
     coordinate_space: 'colmap_original' as const,
     transform_info: {
-      note: 'Coords are in original COLMAP space. Viewer applies: center offset + floor alignment + scale + Y-flip for display only.',
+      note: 'Positions are in COLMAP space (unitless). When calibrated, *_m fields give the same data in meters. Conversion: meters = colmap * meters_per_colmap_unit.',
       center_offset: {
         cx: transform.cx,
         cy: transform.cy,
@@ -34,6 +44,9 @@ export function exportToJSON(input: ExportInput): string {
         alignQ: transform.alignQ ? transform.alignQ.toArray() : null,
       },
       floor_height_viewer: floorHeightViewer,
+      meters_per_viewer_unit: metersPerViewerUnit,
+      meters_per_colmap_unit: metersPerColmapUnit,
+      calibrated,
     },
     nodes: [
       ...pois.map((p) => ({
@@ -44,6 +57,7 @@ export function exportToJSON(input: ExportInput): string {
         description: p.desc,
         floor: p.floor,
         position: { x: p.x, y: p.y, z: p.z },
+        position_m: toMetersPos(p.x, p.y, p.z),
       })),
       ...waypoints.map((w) => ({
         id: w.id,
@@ -51,6 +65,7 @@ export function exportToJSON(input: ExportInput): string {
         label: w.label,
         floor: w.floor,
         position: { x: w.x, y: w.y, z: w.z },
+        position_m: toMetersPos(w.x, w.y, w.z),
       })),
     ],
     edges: edges.map((e) => ({
@@ -59,6 +74,8 @@ export function exportToJSON(input: ExportInput): string {
       to: e.to,
       weight_3d: e.weight,
       weight_2d: e.weight2d,
+      length_3d_m: toMetersScalar(e.weight),
+      length_2d_m: toMetersScalar(e.weight2d),
     })),
     summary: {
       total_pois: pois.length,
@@ -128,6 +145,7 @@ interface RawData {
       alignQ?: number[] | null
     }
     floor_height_viewer?: number
+    meters_per_viewer_unit?: number | null
   }
 }
 
@@ -184,12 +202,14 @@ export function parseImportJSON(text: string): ImportResult {
       if (co.alignQ) transform.alignQ = new THREE.Quaternion().fromArray(co.alignQ)
     }
 
+    const mpvu = data.transform_info?.meters_per_viewer_unit
     return {
       pois,
       waypoints,
       edges,
       transform,
       floorHeightViewer: data.transform_info?.floor_height_viewer,
+      metersPerViewerUnit: typeof mpvu === 'number' && isFinite(mpvu) && mpvu > 0 ? mpvu : null,
       version: '2.0',
     }
   }
@@ -208,5 +228,5 @@ export function parseImportJSON(text: string): ImportResult {
     floor: 0,
     x: w.position.x, y: w.position.y, z: w.position.z,
   }))
-  return { pois, waypoints, edges: [], transform: {}, version: '1' }
+  return { pois, waypoints, edges: [], transform: {}, metersPerViewerUnit: null, version: '1' }
 }

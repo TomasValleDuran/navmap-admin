@@ -75,3 +75,16 @@ export function edgeTubeRadius(scale: number): number {
 export function edgeMarkerRadius(nodeType: 'poi' | 'waypoint', scale: number): number {
   return markerR(nodeType === 'poi' ? 0.9 : 0.65, scale)
 }
+
+export function formatColmapDistance(
+  colmapDist: number,
+  scale: number,
+  metersPerViewerUnit: number | null,
+  digits = 2,
+): string {
+  if (metersPerViewerUnit != null && isFinite(metersPerViewerUnit) && metersPerViewerUnit > 0) {
+    const meters = colmapDist * scale * metersPerViewerUnit
+    return `${meters.toFixed(digits)} m`
+  }
+  return `${colmapDist.toFixed(digits)} u`
+}

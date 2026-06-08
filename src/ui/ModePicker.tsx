@@ -1,4 +1,4 @@
-import { Crosshair, Eye, GitBranch, MapPin, Navigation } from 'lucide-react'
+import { Crosshair, Eye, GitBranch, MapPin, Navigation, Ruler } from 'lucide-react'
 import { useNavmapStore } from '../store/useNavmapStore'
 import type { Mode } from '../types/navmap'
 import type { LucideIcon } from 'lucide-react'
@@ -9,6 +9,7 @@ const MODES: { key: Mode; label: string; hint: string; Icon: LucideIcon; shortcu
   { key: 'waypoint', label: 'Waypoint', hint: 'Click en el piso para crear un waypoint.', Icon: Navigation, shortcut: '3' },
   { key: 'edge', label: 'Conectar', hint: 'Click en dos nodos para conectarlos.', Icon: GitBranch, shortcut: '4' },
   { key: 'select', label: 'Seleccionar', hint: 'Click en un nodo para inspeccionarlo.', Icon: Crosshair, shortcut: '5' },
+  { key: 'measure', label: 'Medir', hint: 'Click en dos puntos del modelo para medir.', Icon: Ruler, shortcut: '6' },
 ]
 
 export function ModePicker() {

@@ -9,6 +9,7 @@ const MODE_KEYS: Record<string, Mode> = {
   '3': 'waypoint',
   '4': 'edge',
   '5': 'select',
+  '6': 'measure',
 }
 
 function isTypingTarget(el: EventTarget | null): boolean {
@@ -48,6 +49,9 @@ export function useKeyboardShortcuts() {
           s.cancelEdit()
         } else if (s.pendingPoint) {
           s.setPendingPoint(null)
+        } else if (s.measurePoints.length > 0) {
+          s.clearMeasure()
+          s.setStatus('Medición reiniciada.')
         }
       }
     }
