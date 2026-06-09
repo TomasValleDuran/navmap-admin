@@ -83,6 +83,9 @@ interface NavmapState {
     transform?: Partial<Transform>
     floorHeightViewer?: number
     metersPerViewerUnit?: number | null
+    mirrorX?: boolean
+    mirrorY?: boolean
+    mirrorZ?: boolean
   }) => void
 
   measurePoints: MeasurePoint[]
@@ -90,6 +93,11 @@ interface NavmapState {
   addMeasurePoint: (p: MeasurePoint) => void
   clearMeasure: () => void
   setMetersPerViewerUnit: (v: number | null) => void
+
+  mirrorX: boolean
+  mirrorY: boolean
+  mirrorZ: boolean
+  setMirror: (axis: 'x' | 'y' | 'z', v: boolean) => void
 }
 
 const initialTransform: Transform = {
@@ -134,6 +142,18 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
   focusRequestId: 0,
   measurePoints: [],
   metersPerViewerUnit: null,
+  mirrorX: true,
+  mirrorY: true,
+  mirrorZ: false,
+
+  setMirror: (axis, v) =>
+    set(
+      axis === 'x'
+        ? { mirrorX: v }
+        : axis === 'y'
+          ? { mirrorY: v }
+          : { mirrorZ: v },
+    ),
 
   setMode: (mode) =>
     set((s) => ({
@@ -280,7 +300,7 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
   setCameraMode: (cameraMode) => set({ cameraMode }),
   requestFocus: () => set((s) => ({ focusRequestId: s.focusRequestId + 1 })),
 
-  importState: ({ pois, waypoints, edges, transform, floorHeightViewer, metersPerViewerUnit }) =>
+  importState: ({ pois, waypoints, edges, transform, floorHeightViewer, metersPerViewerUnit, mirrorX, mirrorY, mirrorZ }) =>
     set((s) => {
       const nextTransform: Transform = transform
         ? {
@@ -302,6 +322,9 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
         floorHeightViewer: floorHeightViewer ?? s.floorHeightViewer,
         metersPerViewerUnit:
           metersPerViewerUnit !== undefined ? metersPerViewerUnit : s.metersPerViewerUnit,
+        mirrorX: mirrorX !== undefined ? mirrorX : s.mirrorX,
+        mirrorY: mirrorY !== undefined ? mirrorY : s.mirrorY,
+        mirrorZ: mirrorZ !== undefined ? mirrorZ : s.mirrorZ,
         selectedNode: null,
         edgeStart: null,
         pendingPoint: null,

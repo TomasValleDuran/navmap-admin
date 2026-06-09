@@ -1,5 +1,10 @@
 import * as THREE from 'three'
-import { applyQuaternionToPositions, computeFloorAlignment, detectFloorHeightViewer } from './floorAlignment'
+import {
+  applyQuaternionToPositions,
+  computeRobustStats,
+  computeFloorAlignmentMasked,
+  detectFloorHeightMasked,
+} from './floorAlignment'
 
 export interface PreparedModelInfo {
   scale: number
@@ -12,32 +17,40 @@ export interface PreparedModelInfo {
   modelRadius: number
 }
 
+const TARGET_FIT = 8
+const TRIM_PERCENTILE = 0.01
+
 export function prepareModelGeometry(geo: THREE.BufferGeometry, count: number): PreparedModelInfo {
-  geo.computeBoundingBox()
-  const bbox = geo.boundingBox!
-  const center = new THREE.Vector3()
-  bbox.getCenter(center)
-  const cx = center.x, cy = center.y, cz = center.z
+  const pos = geo.attributes.position.array as Float32Array
+
+  const stats = computeRobustStats(pos, count, TRIM_PERCENTILE)
+  const [cx, cy, cz] = stats.median
+
   geo.translate(-cx, -cy, -cz)
 
-  const pos = geo.attributes.position.array as Float32Array
-  const alignQ = computeFloorAlignment(pos, count)
+  const alignQ = computeFloorAlignmentMasked(pos, count, stats.inlierMask)
   applyQuaternionToPositions(pos, count, alignQ)
   geo.attributes.position.needsUpdate = true
+
+  const statsAfter = computeRobustStats(pos, count, TRIM_PERCENTILE)
+  const fullExtent = Math.max(
+    statsAfter.half[0],
+    statsAfter.half[1],
+    statsAfter.half[2],
+  ) * 2
+  const scale = fullExtent > 1e-9 ? TARGET_FIT / fullExtent : 1
+
+  geo.scale(scale, scale, scale)
   geo.computeBoundingBox()
 
-  const size = new THREE.Vector3()
-  geo.boundingBox!.getSize(size)
-  const maxDim = Math.max(size.x, size.y, size.z)
-  const scale = 8 / maxDim
-  geo.scale(scale, -scale, scale)
-  geo.computeBoundingBox()
+  const finalStats = computeRobustStats(pos, count, TRIM_PERCENTILE)
+  const modelRadius = Math.hypot(
+    finalStats.half[0],
+    finalStats.half[1],
+    finalStats.half[2],
+  )
 
-  const sz = new THREE.Vector3()
-  geo.boundingBox!.getSize(sz)
-  const modelRadius = Math.max(sz.x, sz.y, sz.z) * 0.5
-
-  const floorHeightViewer = detectFloorHeightViewer(geo.attributes.position.array as Float32Array, count)
+  const floorHeightViewer = detectFloorHeightMasked(pos, count, finalStats.inlierMask)
 
   return {
     scale,

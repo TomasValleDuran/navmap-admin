@@ -43,7 +43,7 @@ export interface ColmapPos {
 const _tmp = new THREE.Vector3()
 
 export function viewerToColmap(vx: number, vy: number, vz: number, t: Transform): ColmapPos {
-  _tmp.set(vx / t.scale, -vy / t.scale, vz / t.scale)
+  _tmp.set(vx / t.scale, vy / t.scale, vz / t.scale)
   if (t.alignQInv) _tmp.applyQuaternion(t.alignQInv)
   return { x: _tmp.x + t.cx, y: _tmp.y + t.cy, z: _tmp.z + t.cz }
 }
@@ -51,7 +51,7 @@ export function viewerToColmap(vx: number, vy: number, vz: number, t: Transform)
 export function colmapToViewer(x: number, y: number, z: number, t: Transform): ViewerPos {
   _tmp.set(x - t.cx, y - t.cy, z - t.cz)
   if (t.alignQ) _tmp.applyQuaternion(t.alignQ)
-  return { vx: _tmp.x * t.scale, vy: -_tmp.y * t.scale, vz: _tmp.z * t.scale }
+  return { vx: _tmp.x * t.scale, vy: _tmp.y * t.scale, vz: _tmp.z * t.scale }
 }
 
 export function markerR(base: number, scale: number): number {

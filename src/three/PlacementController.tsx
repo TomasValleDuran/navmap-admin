@@ -41,6 +41,15 @@ export function PlacementController() {
       ndc.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
       raycaster.current.setFromCamera(ndc.current, camera)
 
+      const sx = state.mirrorX ? -1 : 1
+      const sy = state.mirrorY ? -1 : 1
+      const sz = state.mirrorZ ? -1 : 1
+      const unmirror = (v: THREE.Vector3) => {
+        v.x *= sx
+        v.y *= sy
+        v.z *= sz
+        return v
+      }
       let point: THREE.Vector3 | null = null
       if (state.mode === 'measure') {
         const model = scene.getObjectByName('model-group')
@@ -52,6 +61,7 @@ export function PlacementController() {
           state.setStatus('No se encontró un punto en el modelo.')
           return
         }
+        unmirror(point)
         state.addMeasurePoint({ vx: point.x, vy: point.y, vz: point.z })
         const n = useNavmapStore.getState().measurePoints.length
         state.setStatus(
@@ -70,7 +80,7 @@ export function PlacementController() {
         if (!point) {
           tmpPlane.setFromNormalAndCoplanarPoint(
             new THREE.Vector3(0, 1, 0),
-            tmpHit.set(0, state.floorHeightViewer, 0),
+            tmpHit.set(0, state.floorHeightViewer * sy, 0),
           )
           if (raycaster.current.ray.intersectPlane(tmpPlane, tmpHit)) point = tmpHit.clone()
         }
@@ -85,6 +95,7 @@ export function PlacementController() {
         state.setStatus('No se encontró un punto en el modelo.')
         return
       }
+      unmirror(point)
       const c = viewerToColmap(point.x, point.y, point.z, state.transform)
       state.setPendingPoint({ x: c.x, y: c.y, z: c.z, vx: point.x, vy: point.y, vz: point.z })
     }

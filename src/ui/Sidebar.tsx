@@ -1,4 +1,5 @@
 import { ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { AxesPanel } from './AxesPanel'
 import { ClearAllButton } from './ClearAllButton'
 import { EdgeList } from './EdgeList'
 import { MeasurePanel } from './MeasurePanel'
@@ -44,6 +45,7 @@ export function Sidebar({ width, collapsed, onToggle }: Props) {
       </div>
       <ModePicker />
       <MeasurePanel />
+      <AxesPanel />
       <POIList />
       <WaypointList />
       <EdgeList />

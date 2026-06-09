@@ -24,6 +24,9 @@ export function Header() {
       transform: s.transform,
       floorHeightViewer: s.floorHeightViewer,
       metersPerViewerUnit: s.metersPerViewerUnit,
+      mirrorX: s.mirrorX,
+      mirrorY: s.mirrorY,
+      mirrorZ: s.mirrorZ,
     })
     setStatus(`Exportado: ${s.pois.length} POIs · ${s.waypoints.length} WPs · ${s.edges.length} edges.`)
   }
@@ -39,6 +42,9 @@ export function Header() {
         transform: r.transform,
         floorHeightViewer: r.floorHeightViewer,
         metersPerViewerUnit: r.metersPerViewerUnit,
+        mirrorX: r.mirrorX,
+        mirrorY: r.mirrorY,
+        mirrorZ: r.mirrorZ,
       })
       setStatus(
         `Importado (v${r.version}): ${r.pois.length} POIs · ${r.waypoints.length} WPs · ${r.edges.length} edges.`,

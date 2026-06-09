@@ -37,9 +37,10 @@ export function HoverTracker() {
         if (mHits.length) point = mHits[0].point.clone()
       }
       if (!point) {
+        const sy = state.mirrorY ? -1 : 1
         tmpPlane.setFromNormalAndCoplanarPoint(
           new THREE.Vector3(0, 1, 0),
-          tmpHit.set(0, state.floorHeightViewer, 0),
+          tmpHit.set(0, state.floorHeightViewer * sy, 0),
         )
         if (raycasterRef.current.ray.intersectPlane(tmpPlane, tmpHit)) point = tmpHit.clone()
       }
@@ -47,6 +48,9 @@ export function HoverTracker() {
         state.setCoordHover(null)
         return
       }
+      if (state.mirrorX) point.x *= -1
+      if (state.mirrorY) point.y *= -1
+      if (state.mirrorZ) point.z *= -1
       const c = viewerToColmap(point.x, point.y, point.z, state.transform)
       state.setCoordHover(c)
     }

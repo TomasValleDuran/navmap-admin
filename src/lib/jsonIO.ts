@@ -8,6 +8,9 @@ export interface ExportInput {
   transform: Transform
   floorHeightViewer: number
   metersPerViewerUnit: number | null
+  mirrorX: boolean
+  mirrorY: boolean
+  mirrorZ: boolean
 }
 
 export interface ImportResult {
@@ -17,18 +20,26 @@ export interface ImportResult {
   transform: Partial<Transform>
   floorHeightViewer?: number
   metersPerViewerUnit: number | null
+  mirrorX: boolean
+  mirrorY: boolean
+  mirrorZ: boolean
   version: '1' | '2.0'
 }
 
 export function exportToJSON(input: ExportInput): string {
-  const { pois, waypoints, edges, transform, floorHeightViewer, metersPerViewerUnit } = input
+  const { pois, waypoints, edges, transform, floorHeightViewer, metersPerViewerUnit, mirrorX, mirrorY, mirrorZ } = input
   const calibrated =
     metersPerViewerUnit != null && isFinite(metersPerViewerUnit) && metersPerViewerUnit > 0
   const metersPerColmapUnit = calibrated ? transform.scale * metersPerViewerUnit : null
   const scaleM = metersPerColmapUnit ?? 0
+  const mx = mirrorX ? -1 : 1
+  const my = mirrorY ? -1 : 1
+  const mz = mirrorZ ? -1 : 1
   const toMetersScalar = (v: number) => (calibrated ? v * scaleM : null)
   const toMetersPos = (x: number, y: number, z: number) =>
     calibrated ? { x: x * scaleM, y: y * scaleM, z: z * scaleM } : null
+  const toWorldPos = (x: number, y: number, z: number) =>
+    calibrated ? { x: x * scaleM * mx, y: y * scaleM * my, z: z * scaleM * mz } : null
 
   const data = {
     version: '2.0' as const,
@@ -47,6 +58,9 @@ export function exportToJSON(input: ExportInput): string {
       meters_per_viewer_unit: metersPerViewerUnit,
       meters_per_colmap_unit: metersPerColmapUnit,
       calibrated,
+      mirror_x: mirrorX,
+      mirror_y: mirrorY,
+      mirror_z: mirrorZ,
     },
     nodes: [
       ...pois.map((p) => ({
@@ -58,6 +72,7 @@ export function exportToJSON(input: ExportInput): string {
         floor: p.floor,
         position: { x: p.x, y: p.y, z: p.z },
         position_m: toMetersPos(p.x, p.y, p.z),
+        position_world_m: toWorldPos(p.x, p.y, p.z),
       })),
       ...waypoints.map((w) => ({
         id: w.id,
@@ -66,6 +81,7 @@ export function exportToJSON(input: ExportInput): string {
         floor: w.floor,
         position: { x: w.x, y: w.y, z: w.z },
         position_m: toMetersPos(w.x, w.y, w.z),
+        position_world_m: toWorldPos(w.x, w.y, w.z),
       })),
     ],
     edges: edges.map((e) => ({
@@ -146,6 +162,9 @@ interface RawData {
     }
     floor_height_viewer?: number
     meters_per_viewer_unit?: number | null
+    mirror_x?: boolean
+    mirror_y?: boolean
+    mirror_z?: boolean
   }
 }
 
@@ -210,6 +229,12 @@ export function parseImportJSON(text: string): ImportResult {
       transform,
       floorHeightViewer: data.transform_info?.floor_height_viewer,
       metersPerViewerUnit: typeof mpvu === 'number' && isFinite(mpvu) && mpvu > 0 ? mpvu : null,
+      mirrorX:
+        data.transform_info?.mirror_x !== undefined ? !!data.transform_info.mirror_x : true,
+      mirrorY:
+        data.transform_info?.mirror_y !== undefined ? !!data.transform_info.mirror_y : true,
+      mirrorZ:
+        data.transform_info?.mirror_z !== undefined ? !!data.transform_info.mirror_z : false,
       version: '2.0',
     }
   }
@@ -228,5 +253,15 @@ export function parseImportJSON(text: string): ImportResult {
     floor: 0,
     x: w.position.x, y: w.position.y, z: w.position.z,
   }))
-  return { pois, waypoints, edges: [], transform: {}, metersPerViewerUnit: null, version: '1' }
+  return {
+    pois,
+    waypoints,
+    edges: [],
+    transform: {},
+    metersPerViewerUnit: null,
+    mirrorX: true,
+    mirrorY: true,
+    mirrorZ: false,
+    version: '1',
+  }
 }

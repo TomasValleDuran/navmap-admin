@@ -9,6 +9,7 @@ export function usePLYLoader() {
   const setTransform = useNavmapStore((s) => s.setTransform)
   const setModelLoaded = useNavmapStore((s) => s.setModelLoaded)
   const setFloorHeightViewer = useNavmapStore((s) => s.setFloorHeightViewer)
+  const requestFocus = useNavmapStore((s) => s.requestFocus)
 
   return useCallback(
     async (file: File) => {
@@ -40,6 +41,7 @@ export function usePLYLoader() {
           modelRadius: m.modelRadius,
         })
         setModelLoaded(true)
+        requestFocus()
         setStatus(`${file.name} cargado: ${m.count.toLocaleString()} puntos.`)
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
@@ -49,6 +51,6 @@ export function usePLYLoader() {
         setLoading(false)
       }
     },
-    [setLoading, setStatus, setPointCloud, setTransform, setModelLoaded, setFloorHeightViewer],
+    [setLoading, setStatus, setPointCloud, setTransform, setModelLoaded, setFloorHeightViewer, requestFocus],
   )
 }

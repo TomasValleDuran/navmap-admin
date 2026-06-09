@@ -6,8 +6,15 @@ import { PlacementController } from './PlacementController'
 import { HoverTracker } from './HoverTracker'
 import { CameraRig } from './CameraRig'
 import { MeasureLayer } from './MeasureLayer'
+import { useNavmapStore } from '../store/useNavmapStore'
 
 export function Scene() {
+  const mirrorX = useNavmapStore((s) => s.mirrorX)
+  const mirrorY = useNavmapStore((s) => s.mirrorY)
+  const mirrorZ = useNavmapStore((s) => s.mirrorZ)
+  const sx = mirrorX ? -1 : 1
+  const sy = mirrorY ? -1 : 1
+  const sz = mirrorZ ? -1 : 1
   return (
     <Canvas
       gl={{ antialias: true }}
@@ -21,10 +28,12 @@ export function Scene() {
       <ambientLight intensity={0.5} />
       <directionalLight position={[5, 10, 5]} intensity={0.7} />
       <gridHelper args={[30, 60, 0x1a2030, 0x1a2030]} />
-      <PointCloud />
-      <FloorPlane />
-      <MarkersLayer />
-      <MeasureLayer />
+      <group name="scene-mirror" scale={[sx, sy, sz]}>
+        <PointCloud />
+        <FloorPlane />
+        <MarkersLayer />
+        <MeasureLayer />
+      </group>
       <PlacementController />
       <HoverTracker />
       <CameraRig />
