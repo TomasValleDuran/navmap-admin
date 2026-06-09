@@ -18,7 +18,9 @@ const UP = new THREE.Vector3(0, 1, 0)
 
 export function EdgeTube({ edge }: Props) {
   const transform = useNavmapStore((s) => s.transform)
+  const modelRadius = useNavmapStore((s) => s.modelRadius)
   const floorY = useNavmapStore((s) => s.floorHeightViewer)
+  const mirrorY = useNavmapStore((s) => s.mirrorY)
   const pois = useNavmapStore((s) => s.pois)
   const waypoints = useNavmapStore((s) => s.waypoints)
 
@@ -34,10 +36,10 @@ export function EdgeTube({ edge }: Props) {
     if (!a || !b) return null
     const av = colmapToViewer(a.x, a.y, a.z, transform)
     const bv = colmapToViewer(b.x, b.y, b.z, transform)
-    const aR = edgeMarkerRadius(edge.fromType, transform.scale)
-    const bR = edgeMarkerRadius(edge.toType, transform.scale)
-    const ay = markerDisplayY(av.vy, aR, floorY, transform.scale)
-    const by = markerDisplayY(bv.vy, bR, floorY, transform.scale)
+    const aR = edgeMarkerRadius(edge.fromType, modelRadius)
+    const bR = edgeMarkerRadius(edge.toType, modelRadius)
+    const ay = markerDisplayY(av.vy, aR, floorY, mirrorY)
+    const by = markerDisplayY(bv.vy, bR, floorY, mirrorY)
     const A = new THREE.Vector3(av.vx, ay, av.vz)
     const B = new THREE.Vector3(bv.vx, by, bv.vz)
     const dir = new THREE.Vector3().subVectors(B, A)
@@ -46,10 +48,10 @@ export function EdgeTube({ edge }: Props) {
     const mid = new THREE.Vector3().addVectors(A, B).multiplyScalar(0.5)
     const quat = new THREE.Quaternion().setFromUnitVectors(UP, dir.clone().normalize())
     return { mid, quat, len }
-  }, [edge, pois, waypoints, transform, floorY])
+  }, [edge, pois, waypoints, transform, modelRadius, floorY, mirrorY])
 
   if (!view) return null
-  const r = edgeTubeRadius(transform.scale)
+  const r = edgeTubeRadius(modelRadius)
   return (
     <mesh position={view.mid} quaternion={view.quat}>
       <cylinderGeometry args={[r, r, view.len, 10, 1, false]} />

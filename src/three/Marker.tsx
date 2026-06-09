@@ -17,8 +17,9 @@ interface Props {
 
 export function Marker({ node, nodeType }: Props) {
   const transform = useNavmapStore((s) => s.transform)
-  const scale = transform.scale
+  const modelRadius = useNavmapStore((s) => s.modelRadius)
   const floorY = useNavmapStore((s) => s.floorHeightViewer)
+  const mirrorY = useNavmapStore((s) => s.mirrorY)
   const selectedNode = useNavmapStore((s) => s.selectedNode)
   const edgeStart = useNavmapStore((s) => s.edgeStart)
 
@@ -28,10 +29,10 @@ export function Marker({ node, nodeType }: Props) {
   )
 
   const baseR = nodeType === 'poi' ? 1.6 : 1.2
-  const visualR = markerR(baseR, scale)
-  const hitR = Math.max(visualR * 2.2, markerR(1.8, scale))
+  const visualR = markerR(baseR, modelRadius)
+  const hitR = Math.max(visualR * 2.2, markerR(1.8, modelRadius))
   const haloR = visualR * 1.75
-  const displayY = markerDisplayY(vy, visualR, floorY, scale)
+  const displayY = markerDisplayY(vy, visualR, floorY, mirrorY)
 
   const color = useMemo(() => {
     if (nodeType === 'poi') return POI_COLORS[(node as POI).type] ?? POI_COLORS.other

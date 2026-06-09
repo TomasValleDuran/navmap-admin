@@ -1,10 +1,13 @@
 import * as THREE from 'three'
 import {
   applyQuaternionToPositions,
-  computeFloorAlignment,
-  detectFloorHeightViewer,
+  computeFloorAlignmentMasked,
+  computeRobustStats,
+  detectFloorHeightMasked,
 } from './floorAlignment'
 import type { Transform } from '../types/navmap'
+
+const TRIM_PERCENTILE = 0.01
 
 interface ReturnInfo {
   alignQ: THREE.Quaternion
@@ -23,19 +26,21 @@ export function realignFloorInPlace(
   const invs = 1 / transform.scale
 
   for (let i = 0; i < count; i++) {
-    _v.set(pos[i * 3] * invs, -pos[i * 3 + 1] * invs, pos[i * 3 + 2] * invs)
+    _v.set(pos[i * 3] * invs, pos[i * 3 + 1] * invs, pos[i * 3 + 2] * invs)
     if (transform.alignQInv) _v.applyQuaternion(transform.alignQInv)
     pos[i * 3] = _v.x
     pos[i * 3 + 1] = _v.y
     pos[i * 3 + 2] = _v.z
   }
 
-  const alignQ = computeFloorAlignment(pos, count)
+  const statsPre = computeRobustStats(pos, count, TRIM_PERCENTILE)
+  const alignQ = computeFloorAlignmentMasked(pos, count, statsPre.inlierMask)
   applyQuaternionToPositions(pos, count, alignQ)
-  geometry.scale(transform.scale, -transform.scale, transform.scale)
+  geometry.scale(transform.scale, transform.scale, transform.scale)
   geometry.attributes.position.needsUpdate = true
   geometry.computeBoundingBox()
-  const floorHeightViewer = detectFloorHeightViewer(pos, count)
+  const statsPost = computeRobustStats(pos, count, TRIM_PERCENTILE)
+  const floorHeightViewer = detectFloorHeightMasked(pos, count, statsPost.inlierMask)
   return { alignQ, alignQInv: alignQ.clone().invert(), floorHeightViewer }
 }
 
@@ -50,7 +55,7 @@ export function nudgeFloorTilt(
   const invs = 1 / transform.scale
 
   for (let i = 0; i < count; i++) {
-    _v.set(pos[i * 3] * invs, -pos[i * 3 + 1] * invs, pos[i * 3 + 2] * invs)
+    _v.set(pos[i * 3] * invs, pos[i * 3 + 1] * invs, pos[i * 3 + 2] * invs)
     if (transform.alignQInv) _v.applyQuaternion(transform.alignQInv)
     pos[i * 3] = _v.x
     pos[i * 3 + 1] = _v.y
@@ -63,9 +68,10 @@ export function nudgeFloorTilt(
   const alignQ = nudge.clone().multiply(current).normalize()
 
   applyQuaternionToPositions(pos, count, alignQ)
-  geometry.scale(transform.scale, -transform.scale, transform.scale)
+  geometry.scale(transform.scale, transform.scale, transform.scale)
   geometry.attributes.position.needsUpdate = true
   geometry.computeBoundingBox()
-  const floorHeightViewer = detectFloorHeightViewer(pos, count)
+  const statsPost = computeRobustStats(pos, count, TRIM_PERCENTILE)
+  const floorHeightViewer = detectFloorHeightMasked(pos, count, statsPost.inlierMask)
   return { alignQ, alignQInv: alignQ.clone().invert(), floorHeightViewer }
 }

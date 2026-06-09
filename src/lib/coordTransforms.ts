@@ -54,26 +54,30 @@ export function colmapToViewer(x: number, y: number, z: number, t: Transform): V
   return { vx: _tmp.x * t.scale, vy: _tmp.y * t.scale, vz: _tmp.z * t.scale }
 }
 
-export function markerR(base: number, scale: number): number {
-  const r = base / Math.max(0.05, scale)
-  return Math.max(0.012, Math.min(0.35, r * 0.007))
+export function markerR(base: number, modelRadius: number): number {
+  const r = base * 0.012 * Math.max(1, modelRadius)
+  return Math.max(0.04, Math.min(0.6, r))
 }
 
-export function markerDisplayY(vy: number, radius: number, floorHeightViewer: number, scale: number): number {
-  const eps = Math.max(radius * 0.75, 0.008 / Math.max(0.05, scale))
+export function markerDisplayY(
+  vy: number,
+  radius: number,
+  floorHeightViewer: number,
+  mirrorY: boolean,
+): number {
+  const eps = Math.max(radius * 0.75, 0.02)
   if (Math.abs(vy - floorHeightViewer) < eps) {
-    return floorHeightViewer + radius * 1.25
+    return floorHeightViewer + (mirrorY ? -1 : 1) * radius * 1.25
   }
   return vy
 }
 
-export function edgeTubeRadius(scale: number): number {
-  const base = 0.025 / Math.max(0.05, scale)
-  return Math.max(0.005, Math.min(0.06, base * 0.06))
+export function edgeTubeRadius(modelRadius: number): number {
+  return Math.max(0.015, Math.min(0.08, Math.max(1, modelRadius) * 0.004))
 }
 
-export function edgeMarkerRadius(nodeType: 'poi' | 'waypoint', scale: number): number {
-  return markerR(nodeType === 'poi' ? 0.9 : 0.65, scale)
+export function edgeMarkerRadius(nodeType: 'poi' | 'waypoint', modelRadius: number): number {
+  return markerR(nodeType === 'poi' ? 0.9 : 0.65, modelRadius)
 }
 
 export function formatColmapDistance(

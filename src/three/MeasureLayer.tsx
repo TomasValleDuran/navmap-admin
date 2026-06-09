@@ -8,7 +8,7 @@ const LINE_COLOR = 0xfde047
 
 export function MeasureLayer() {
   const points = useNavmapStore((s) => s.measurePoints)
-  const scale = useNavmapStore((s) => s.transform.scale)
+  const modelRadius = useNavmapStore((s) => s.modelRadius)
   const modelLoaded = useNavmapStore((s) => s.modelLoaded)
 
   const lineGeom = useMemo(() => {
@@ -23,7 +23,7 @@ export function MeasureLayer() {
   }, [points])
 
   if (!modelLoaded || points.length === 0) return null
-  const r = markerR(1.0, scale)
+  const r = markerR(1.0, modelRadius)
 
   return (
     <group name="measure-group">
