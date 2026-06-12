@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import { useThree } from '@react-three/fiber'
 import { useNavmapStore } from '../store/useNavmapStore'
 import { viewerToColmap } from '../lib/coordTransforms'
+import { pickPointOnModel } from '../lib/pointPicking'
 
 const DRAG_PIXELS = 5
 const tmpPlane = new THREE.Plane()
@@ -34,7 +35,13 @@ export function PlacementController() {
       if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > DRAG_PIXELS) return
       const state = useNavmapStore.getState()
       if (!state.modelLoaded) return
-      if (state.mode !== 'poi' && state.mode !== 'waypoint' && state.mode !== 'measure') return
+      if (
+        state.mode !== 'poi' &&
+        state.mode !== 'waypoint' &&
+        state.mode !== 'measure' &&
+        state.mode !== 'anchor'
+      )
+        return
 
       const rect = dom.getBoundingClientRect()
       ndc.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
@@ -54,8 +61,7 @@ export function PlacementController() {
       if (state.mode === 'measure') {
         const model = scene.getObjectByName('model-group')
         if (model) {
-          const h = raycaster.current.intersectObjects(model.children, true)
-          if (h.length) point = h[0].point.clone()
+          point = pickPointOnModel(raycaster.current, model, state.modelRadius, { precise: true })
         }
         if (!point) {
           state.setStatus('No se encontró un punto en el modelo.')
@@ -87,8 +93,9 @@ export function PlacementController() {
       } else {
         const model = scene.getObjectByName('model-group')
         if (model) {
-          const h = raycaster.current.intersectObjects(model.children, true)
-          if (h.length) point = h[0].point.clone()
+          point = pickPointOnModel(raycaster.current, model, state.modelRadius, {
+            precise: state.mode === 'anchor',
+          })
         }
       }
       if (!point) {

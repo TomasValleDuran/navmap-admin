@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import { useThree } from '@react-three/fiber'
 import { useNavmapStore } from '../store/useNavmapStore'
 import { viewerToColmap } from '../lib/coordTransforms'
+import { pickPointOnModel } from '../lib/pointPicking'
 
 const tmpPlane = new THREE.Plane()
 const tmpHit = new THREE.Vector3()
@@ -26,31 +27,46 @@ export function HoverTracker() {
 
       const modelGroup = scene.getObjectByName('model-group')
       const floorMesh = scene.getObjectByName('floor-solid')
+      const measuring = state.mode === 'measure' || state.mode === 'anchor'
 
       let point: THREE.Vector3 | null = null
-      if (floorMesh) {
-        const fHits = raycasterRef.current.intersectObject(floorMesh, false)
-        if (fHits.length) point = fHits[0].point.clone()
-      }
-      if (!point && modelGroup) {
-        const mHits = raycasterRef.current.intersectObjects(modelGroup.children, true)
-        if (mHits.length) point = mHits[0].point.clone()
-      }
-      if (!point) {
-        const sy = state.mirrorY ? -1 : 1
-        tmpPlane.setFromNormalAndCoplanarPoint(
-          new THREE.Vector3(0, 1, 0),
-          tmpHit.set(0, state.floorHeightViewer * sy, 0),
-        )
-        if (raycasterRef.current.ray.intersectPlane(tmpPlane, tmpHit)) point = tmpHit.clone()
+      if (measuring) {
+        // mirror the click path exactly: model-only, precise robust pick
+        if (modelGroup) {
+          point = pickPointOnModel(raycasterRef.current, modelGroup, state.modelRadius, {
+            precise: true,
+          })
+        }
+      } else {
+        if (floorMesh) {
+          const fHits = raycasterRef.current.intersectObject(floorMesh, false)
+          if (fHits.length) point = fHits[0].point.clone()
+        }
+        if (!point && modelGroup) {
+          point = pickPointOnModel(raycasterRef.current, modelGroup, state.modelRadius)
+        }
+        if (!point) {
+          const sy = state.mirrorY ? -1 : 1
+          tmpPlane.setFromNormalAndCoplanarPoint(
+            new THREE.Vector3(0, 1, 0),
+            tmpHit.set(0, state.floorHeightViewer * sy, 0),
+          )
+          if (raycasterRef.current.ray.intersectPlane(tmpPlane, tmpHit)) point = tmpHit.clone()
+        }
       }
       if (!point) {
         state.setCoordHover(null)
+        if (state.measureHover) state.setMeasureHover(null)
         return
       }
       if (state.mirrorX) point.x *= -1
       if (state.mirrorY) point.y *= -1
       if (state.mirrorZ) point.z *= -1
+      if (measuring) {
+        state.setMeasureHover({ vx: point.x, vy: point.y, vz: point.z })
+      } else if (state.measureHover) {
+        state.setMeasureHover(null)
+      }
       const c = viewerToColmap(point.x, point.y, point.z, state.transform)
       state.setCoordHover(c)
     }
@@ -65,7 +81,11 @@ export function HoverTracker() {
       if (rafRef.current == null) rafRef.current = requestAnimationFrame(computeAndSet)
     }
 
-    const onLeave = () => useNavmapStore.getState().setCoordHover(null)
+    const onLeave = () => {
+      const s = useNavmapStore.getState()
+      s.setCoordHover(null)
+      s.setMeasureHover(null)
+    }
 
     dom.addEventListener('pointermove', onMove)
     dom.addEventListener('pointerleave', onLeave)

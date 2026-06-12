@@ -14,6 +14,8 @@ const CURSORS: Record<string, string> = {
   waypoint: 'cursor-crosshair',
   edge: 'cursor-crosshair',
   select: 'cursor-pointer',
+  measure: 'cursor-crosshair',
+  anchor: 'cursor-crosshair',
 }
 
 export function CanvasArea() {

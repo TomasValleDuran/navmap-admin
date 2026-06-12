@@ -6,6 +6,7 @@ import { CanvasArea } from './ui/CanvasArea'
 import { ResizeHandle } from './ui/ResizeHandle'
 import { POIModal } from './ui/modals/POIModal'
 import { WaypointModal } from './ui/modals/WaypointModal'
+import { AnchorModal } from './ui/modals/AnchorModal'
 import { EditNodeModal } from './ui/modals/EditNodeModal'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 
@@ -101,6 +102,7 @@ export default function App() {
       </div>
       <POIModal />
       <WaypointModal />
+      <AnchorModal />
       <EditNodeModal />
     </div>
   )

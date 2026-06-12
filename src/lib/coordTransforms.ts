@@ -27,6 +27,7 @@ export const POI_ICONS: Record<POIType, string> = {
 
 export const WAYPOINT_COLOR = 0x34c98a
 export const EDGE_COLOR = 0xf0a030
+export const ANCHOR_COLOR = 0xf472b6
 
 export interface ViewerPos {
   vx: number

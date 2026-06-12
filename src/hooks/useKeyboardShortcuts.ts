@@ -10,6 +10,7 @@ const MODE_KEYS: Record<string, Mode> = {
   '4': 'edge',
   '5': 'select',
   '6': 'measure',
+  '7': 'anchor',
 }
 
 function isTypingTarget(el: EventTarget | null): boolean {
@@ -34,6 +35,13 @@ export function useKeyboardShortcuts() {
         const next = cameraMode === 'orbit' ? 'walk' : 'orbit'
         setCameraMode(next)
         setStatus(next === 'orbit' ? 'Modo cámara: Órbita.' : 'Modo cámara: Caminar.')
+        return
+      }
+      if (e.key === 't' || e.key === 'T') {
+        const { cameraMode, setCameraMode, setStatus } = useNavmapStore.getState()
+        const next = cameraMode === 'plan' ? 'orbit' : 'plan'
+        setCameraMode(next)
+        setStatus(next === 'plan' ? 'Vista en planta (T para volver).' : 'Modo cámara: Órbita.')
         return
       }
       if (e.key === 'f' || e.key === 'F') {

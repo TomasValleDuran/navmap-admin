@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { adaptivePointSize, parsePLY } from './plyParser'
+import { filterIsolatedPoints } from './outlierFilter'
 import { prepareModelGeometry } from './prepareModel'
 
 export interface LoadedModel {
@@ -15,21 +16,24 @@ export interface LoadedModel {
   alignQInv: THREE.Quaternion
   floorHeightViewer: number
   modelRadius: number
+  removedOutliers: number
 }
 
 export function buildModelFromBuffer(buffer: ArrayBuffer): LoadedModel {
-  const { pos, col, hasC, count } = parsePLY(buffer)
+  const parsed = parsePLY(buffer)
+  const { pos, col, count, removed } = filterIsolatedPoints(parsed.pos, parsed.col, parsed.count)
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
-  if (hasC && col.length === pos.length) {
+  if (parsed.hasC && col.length === pos.length) {
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(col, 3))
   }
   const info = prepareModelGeometry(geometry, count)
   return {
     geometry,
-    hasColor: hasC,
+    hasColor: parsed.hasC,
     pointSize: adaptivePointSize(count),
     count,
+    removedOutliers: removed,
     ...info,
   }
 }

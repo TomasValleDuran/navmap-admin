@@ -1,3 +1,4 @@
+import { AlertTriangle } from 'lucide-react'
 import { useNavmapStore } from '../store/useNavmapStore'
 import { formatColmapDistance } from '../lib/coordTransforms'
 
@@ -9,6 +10,11 @@ export function EdgeList() {
   const setStatus = useNavmapStore((s) => s.setStatus)
   const scale = useNavmapStore((s) => s.transform.scale)
   const mpvu = useNavmapStore((s) => s.metersPerViewerUnit)
+  const validationIssues = useNavmapStore((s) => s.validationIssues)
+
+  const flagged = new Set(
+    (validationIssues ?? []).filter((i) => i.edgeId).map((i) => i.edgeId as string),
+  )
 
   const labelOf = (id: string, type: 'poi' | 'waypoint'): string => {
     if (type === 'poi') return pois.find((p) => p.id === id)?.name ?? id
@@ -36,6 +42,13 @@ export function EdgeList() {
                 <span className="text-muted"> → </span>
                 <span className="text-text">{labelOf(e.to, e.toType)}</span>
               </div>
+              {flagged.has(e.id) && (
+                <AlertTriangle
+                  size={12}
+                  className="shrink-0 text-accent-orange"
+                  aria-label="Posible cruce de pared"
+                />
+              )}
               <span className="font-mono text-[10px] text-muted">
                 {formatColmapDistance(e.weight, scale, mpvu)}
               </span>

@@ -17,10 +17,25 @@ export function Header() {
       alert('Nada para exportar. Agregá POIs o waypoints primero.')
       return
     }
+    const issues = s.runValidation()
+    const warnings = issues.filter((i) => i.severity === 'warn')
+    if (warnings.length > 0) {
+      const ok = confirm(
+        `La validación encontró ${warnings.length} problema(s):\n\n` +
+          warnings.map((i) => `• ${i.message}`).join('\n') +
+          '\n\n¿Exportar igual?',
+      )
+      if (!ok) {
+        setStatus('Export cancelado: revisá los avisos de validación.')
+        return
+      }
+    }
     downloadJSON({
       pois: s.pois,
       waypoints: s.waypoints,
       edges: s.edges,
+      anchors: s.anchors,
+      calibrationSamples: s.calibrationSamples,
       transform: s.transform,
       floorHeightViewer: s.floorHeightViewer,
       metersPerViewerUnit: s.metersPerViewerUnit,
@@ -28,7 +43,9 @@ export function Header() {
       mirrorY: s.mirrorY,
       mirrorZ: s.mirrorZ,
     })
-    setStatus(`Exportado: ${s.pois.length} POIs · ${s.waypoints.length} WPs · ${s.edges.length} edges.`)
+    setStatus(
+      `Exportado: ${s.pois.length} POIs · ${s.waypoints.length} WPs · ${s.edges.length} edges · ${s.anchors.length} anclas.`,
+    )
   }
 
   const onImport = async (file: File) => {
@@ -39,6 +56,8 @@ export function Header() {
         pois: r.pois,
         waypoints: r.waypoints,
         edges: r.edges,
+        anchors: r.anchors,
+        calibrationSamples: r.calibrationSamples,
         transform: r.transform,
         floorHeightViewer: r.floorHeightViewer,
         metersPerViewerUnit: r.metersPerViewerUnit,

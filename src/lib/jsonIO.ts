@@ -1,10 +1,21 @@
 import * as THREE from 'three'
-import type { Edge, NodeType, POI, POIType, Transform, Waypoint } from '../types/navmap'
+import type {
+  AnchorPoint,
+  CalibrationSample,
+  Edge,
+  NodeType,
+  POI,
+  POIType,
+  Transform,
+  Waypoint,
+} from '../types/navmap'
 
 export interface ExportInput {
   pois: POI[]
   waypoints: Waypoint[]
   edges: Edge[]
+  anchors: AnchorPoint[]
+  calibrationSamples: CalibrationSample[]
   transform: Transform
   floorHeightViewer: number
   metersPerViewerUnit: number | null
@@ -17,6 +28,8 @@ export interface ImportResult {
   pois: POI[]
   waypoints: Waypoint[]
   edges: Edge[]
+  anchors: AnchorPoint[]
+  calibrationSamples: CalibrationSample[]
   transform: Partial<Transform>
   floorHeightViewer?: number
   metersPerViewerUnit: number | null
@@ -27,7 +40,7 @@ export interface ImportResult {
 }
 
 export function exportToJSON(input: ExportInput): string {
-  const { pois, waypoints, edges, transform, floorHeightViewer, metersPerViewerUnit, mirrorX, mirrorY, mirrorZ } = input
+  const { pois, waypoints, edges, anchors, calibrationSamples, transform, floorHeightViewer, metersPerViewerUnit, mirrorX, mirrorY, mirrorZ } = input
   const calibrated =
     metersPerViewerUnit != null && isFinite(metersPerViewerUnit) && metersPerViewerUnit > 0
   const metersPerColmapUnit = calibrated ? transform.scale * metersPerViewerUnit : null
@@ -61,7 +74,22 @@ export function exportToJSON(input: ExportInput): string {
       mirror_x: mirrorX,
       mirror_y: mirrorY,
       mirror_z: mirrorZ,
+      calibration_samples: calibrationSamples.map((s) => ({
+        id: s.id,
+        a: s.a,
+        b: s.b,
+        real_m: s.realMeters,
+      })),
     },
+    anchors: anchors.map((a) => ({
+      id: a.id,
+      label: a.label,
+      description: a.desc,
+      floor: a.floor,
+      position: { x: a.x, y: a.y, z: a.z },
+      position_m: toMetersPos(a.x, a.y, a.z),
+      position_world_m: toWorldPos(a.x, a.y, a.z),
+    })),
     nodes: [
       ...pois.map((p) => ({
         id: p.id,
@@ -97,6 +125,7 @@ export function exportToJSON(input: ExportInput): string {
       total_pois: pois.length,
       total_waypoints: waypoints.length,
       total_edges: edges.length,
+      total_anchors: anchors.length,
     },
   }
   return JSON.stringify(data, null, 2)
@@ -146,10 +175,26 @@ interface V1Waypoint {
   position: { x: number; y: number; z: number }
 }
 
+interface V2Anchor {
+  id: string
+  label?: string
+  description?: string
+  floor?: number
+  position: { x: number; y: number; z: number }
+}
+
+interface V2CalibrationSample {
+  id?: string
+  a: { x: number; y: number; z: number }
+  b: { x: number; y: number; z: number }
+  real_m: number
+}
+
 interface RawData {
   version?: string
   nodes?: V2Node[]
   edges?: V2Edge[]
+  anchors?: V2Anchor[]
   pois?: V1Poi[]
   waypoints?: V1Waypoint[]
   transform_info?: {
@@ -165,6 +210,7 @@ interface RawData {
     mirror_x?: boolean
     mirror_y?: boolean
     mirror_z?: boolean
+    calibration_samples?: V2CalibrationSample[]
   }
 }
 
@@ -221,11 +267,33 @@ export function parseImportJSON(text: string): ImportResult {
       if (co.alignQ) transform.alignQ = new THREE.Quaternion().fromArray(co.alignQ)
     }
 
+    const anchors: AnchorPoint[] = (data.anchors ?? []).map((a, i) => ({
+      id: a.id,
+      label: a.label ?? `ANCLA-${i + 1}`,
+      desc: a.description ?? '',
+      floor: a.floor ?? 0,
+      x: a.position.x,
+      y: a.position.y,
+      z: a.position.z,
+    }))
+    const calibrationSamples: CalibrationSample[] = (
+      data.transform_info?.calibration_samples ?? []
+    )
+      .filter((s) => s && s.a && s.b && typeof s.real_m === 'number' && s.real_m > 0)
+      .map((s, i) => ({
+        id: s.id ?? `cal_imported_${i}`,
+        a: s.a,
+        b: s.b,
+        realMeters: s.real_m,
+      }))
+
     const mpvu = data.transform_info?.meters_per_viewer_unit
     return {
       pois,
       waypoints,
       edges,
+      anchors,
+      calibrationSamples,
       transform,
       floorHeightViewer: data.transform_info?.floor_height_viewer,
       metersPerViewerUnit: typeof mpvu === 'number' && isFinite(mpvu) && mpvu > 0 ? mpvu : null,
@@ -257,6 +325,8 @@ export function parseImportJSON(text: string): ImportResult {
     pois,
     waypoints,
     edges: [],
+    anchors: [],
+    calibrationSamples: [],
     transform: {},
     metersPerViewerUnit: null,
     mirrorX: true,

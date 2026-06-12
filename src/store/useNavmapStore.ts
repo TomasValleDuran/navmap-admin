@@ -3,7 +3,12 @@ import * as THREE from 'three'
 import type {
   ColmapPos,
 } from '../lib/coordTransforms'
+import { viewerToColmap } from '../lib/coordTransforms'
+import { fitMetersPerViewerUnit } from '../lib/calibration'
+import { validateGraph, type ValidationIssue } from '../lib/graphValidation'
 import type {
+  AnchorPoint,
+  CalibrationSample,
   Edge,
   EdgeStart,
   MeasurePoint,
@@ -71,8 +76,8 @@ interface NavmapState {
   startEdit: (n: SelectedNode) => void
   cancelEdit: () => void
 
-  cameraMode: 'orbit' | 'walk'
-  setCameraMode: (m: 'orbit' | 'walk') => void
+  cameraMode: 'orbit' | 'walk' | 'plan'
+  setCameraMode: (m: 'orbit' | 'walk' | 'plan') => void
   focusRequestId: number
   requestFocus: () => void
 
@@ -80,6 +85,8 @@ interface NavmapState {
     pois: POI[]
     waypoints: Waypoint[]
     edges: Edge[]
+    anchors?: AnchorPoint[]
+    calibrationSamples?: CalibrationSample[]
     transform?: Partial<Transform>
     floorHeightViewer?: number
     metersPerViewerUnit?: number | null
@@ -89,10 +96,24 @@ interface NavmapState {
   }) => void
 
   measurePoints: MeasurePoint[]
+  measureHover: MeasurePoint | null
   metersPerViewerUnit: number | null
+  calibrationSamples: CalibrationSample[]
   addMeasurePoint: (p: MeasurePoint) => void
   clearMeasure: () => void
+  setMeasureHover: (p: MeasurePoint | null) => void
   setMetersPerViewerUnit: (v: number | null) => void
+  addCalibrationSample: (realMeters: number) => CalibrationSample | null
+  removeCalibrationSample: (id: string) => void
+  clearCalibration: () => void
+
+  anchors: AnchorPoint[]
+  addAnchor: (data: { label: string; desc: string; floor: number }) => AnchorPoint | null
+  deleteAnchor: (id: string) => void
+
+  validationIssues: ValidationIssue[] | null
+  runValidation: () => ValidationIssue[]
+  clearValidation: () => void
 
   mirrorX: boolean
   mirrorY: boolean
@@ -141,7 +162,11 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
   cameraMode: 'orbit',
   focusRequestId: 0,
   measurePoints: [],
+  measureHover: null,
   metersPerViewerUnit: null,
+  calibrationSamples: [],
+  anchors: [],
+  validationIssues: null,
   mirrorX: true,
   mirrorY: true,
   mirrorZ: false,
@@ -160,6 +185,7 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
       mode,
       edgeStart: null,
       measurePoints: mode === 'measure' ? s.measurePoints : [],
+      measureHover: null,
     })),
 
   addMeasurePoint: (p) =>
@@ -167,8 +193,80 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
       const next = s.measurePoints.length >= 2 ? [p] : [...s.measurePoints, p]
       return { measurePoints: next }
     }),
-  clearMeasure: () => set({ measurePoints: [] }),
+  clearMeasure: () => set({ measurePoints: [], measureHover: null }),
+  setMeasureHover: (measureHover) => set({ measureHover }),
   setMetersPerViewerUnit: (metersPerViewerUnit) => set({ metersPerViewerUnit }),
+
+  addCalibrationSample: (realMeters) => {
+    const s = get()
+    if (s.measurePoints.length !== 2 || !isFinite(realMeters) || realMeters <= 0) return null
+    const [pa, pb] = s.measurePoints
+    const sample: CalibrationSample = {
+      id: `cal_${Date.now()}`,
+      a: viewerToColmap(pa.vx, pa.vy, pa.vz, s.transform),
+      b: viewerToColmap(pb.vx, pb.vy, pb.vz, s.transform),
+      realMeters,
+    }
+    const samples = [...s.calibrationSamples, sample]
+    const factor = fitMetersPerViewerUnit(samples, s.transform)
+    set({
+      calibrationSamples: samples,
+      metersPerViewerUnit: factor ?? s.metersPerViewerUnit,
+      measurePoints: [],
+      measureHover: null,
+    })
+    return sample
+  },
+
+  removeCalibrationSample: (id) =>
+    set((s) => {
+      const samples = s.calibrationSamples.filter((c) => c.id !== id)
+      return {
+        calibrationSamples: samples,
+        metersPerViewerUnit: samples.length
+          ? fitMetersPerViewerUnit(samples, s.transform)
+          : null,
+      }
+    }),
+
+  clearCalibration: () => set({ calibrationSamples: [], metersPerViewerUnit: null }),
+
+  addAnchor: ({ label, desc, floor }) => {
+    const p = get().pendingPoint
+    if (!p) return null
+    const anchor: AnchorPoint = {
+      id: `anchor_${Date.now()}`,
+      label: label || `ANCLA-${get().anchors.length + 1}`,
+      desc,
+      floor,
+      x: p.x,
+      y: p.y,
+      z: p.z,
+    }
+    set((s) => ({ anchors: [...s.anchors, anchor], pendingPoint: null }))
+    return anchor
+  },
+
+  deleteAnchor: (id) => set((s) => ({ anchors: s.anchors.filter((a) => a.id !== id) })),
+
+  runValidation: () => {
+    const s = get()
+    const issues = validateGraph({
+      pois: s.pois,
+      waypoints: s.waypoints,
+      edges: s.edges,
+      anchors: s.anchors,
+      transform: s.transform,
+      floorHeightViewer: s.floorHeightViewer,
+      metersPerViewerUnit: s.metersPerViewerUnit,
+      modelRadius: s.modelRadius,
+      pointCloudGeometry: s.pointCloudGeometry,
+    })
+    set({ validationIssues: issues })
+    return issues
+  },
+  clearValidation: () => set({ validationIssues: null }),
+
   setPendingPoint: (pendingPoint) => set({ pendingPoint }),
 
   addPOI: ({ name, type, desc, floor }) => {
@@ -260,10 +358,13 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
       pois: [],
       waypoints: [],
       edges: [],
+      anchors: [],
       selectedNode: null,
       edgeStart: null,
       pendingPoint: null,
       measurePoints: [],
+      measureHover: null,
+      validationIssues: null,
     }),
 
   setFloorLock: (floorLock) => set({ floorLock }),
@@ -300,7 +401,7 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
   setCameraMode: (cameraMode) => set({ cameraMode }),
   requestFocus: () => set((s) => ({ focusRequestId: s.focusRequestId + 1 })),
 
-  importState: ({ pois, waypoints, edges, transform, floorHeightViewer, metersPerViewerUnit, mirrorX, mirrorY, mirrorZ }) =>
+  importState: ({ pois, waypoints, edges, anchors, calibrationSamples, transform, floorHeightViewer, metersPerViewerUnit, mirrorX, mirrorY, mirrorZ }) =>
     set((s) => {
       const nextTransform: Transform = transform
         ? {
@@ -318,6 +419,8 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
         pois,
         waypoints,
         edges,
+        anchors: anchors ?? [],
+        calibrationSamples: calibrationSamples ?? [],
         transform: nextTransform,
         floorHeightViewer: floorHeightViewer ?? s.floorHeightViewer,
         metersPerViewerUnit:
@@ -329,6 +432,8 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
         edgeStart: null,
         pendingPoint: null,
         measurePoints: [],
+        measureHover: null,
+        validationIssues: null,
       }
     }),
 }))

@@ -1,10 +1,12 @@
 import { ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { AnchorList } from './AnchorList'
 import { AxesPanel } from './AxesPanel'
 import { ClearAllButton } from './ClearAllButton'
 import { EdgeList } from './EdgeList'
 import { MeasurePanel } from './MeasurePanel'
 import { ModePicker } from './ModePicker'
 import { POIList } from './POIList'
+import { ValidationPanel } from './ValidationPanel'
 import { WaypointList } from './WaypointList'
 
 interface Props {
@@ -49,6 +51,8 @@ export function Sidebar({ width, collapsed, onToggle }: Props) {
       <POIList />
       <WaypointList />
       <EdgeList />
+      <AnchorList />
+      <ValidationPanel />
       <ClearAllButton />
     </aside>
   )

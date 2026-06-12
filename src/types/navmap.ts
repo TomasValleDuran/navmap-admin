@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 
-export type Mode = 'view' | 'poi' | 'waypoint' | 'edge' | 'select' | 'measure'
+export type Mode = 'view' | 'poi' | 'waypoint' | 'edge' | 'select' | 'measure' | 'anchor'
 
 export interface MeasurePoint {
   vx: number
@@ -41,6 +41,23 @@ export interface Waypoint {
   z: number
 }
 
+export interface AnchorPoint {
+  id: string
+  label: string
+  desc: string
+  floor: number
+  x: number
+  y: number
+  z: number
+}
+
+export interface CalibrationSample {
+  id: string
+  a: { x: number; y: number; z: number }
+  b: { x: number; y: number; z: number }
+  realMeters: number
+}
+
 export interface Edge {
   id: string
   from: string
@@ -79,21 +96,3 @@ export interface Transform {
   alignQInv: THREE.Quaternion | null
 }
 
-export interface AnnotationsV2 {
-  version: '2.0'
-  exported_at: string
-  coordinate_space: 'colmap_original'
-  transform_info: {
-    center: [number, number, number]
-    scale: number
-    alignQ: [number, number, number, number] | null
-    floorHeightViewer: number
-    metersPerViewerUnit: number | null
-  }
-  nodes: Array<
-    | ({ kind: 'poi' } & POI)
-    | ({ kind: 'waypoint' } & Waypoint)
-  >
-  edges: Edge[]
-  summary: { pois: number; waypoints: number; edges: number }
-}

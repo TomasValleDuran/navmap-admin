@@ -42,7 +42,11 @@ export function usePLYLoader() {
         })
         setModelLoaded(true)
         requestFocus()
-        setStatus(`${file.name} cargado: ${m.count.toLocaleString()} puntos.`)
+        setStatus(
+          m.removedOutliers > 0
+            ? `${file.name} cargado: ${m.count.toLocaleString()} puntos (${m.removedOutliers.toLocaleString()} outliers filtrados).`
+            : `${file.name} cargado: ${m.count.toLocaleString()} puntos.`,
+        )
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         setStatus(`Error cargando PLY: ${msg}`)

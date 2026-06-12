@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Ruler } from 'lucide-react'
 import { useNavmapStore } from '../store/useNavmapStore'
+import { sampleResidual } from '../lib/calibration'
 
 function formatNumber(n: number, digits = 3): string {
   if (!isFinite(n)) return '–'
@@ -10,7 +11,12 @@ function formatNumber(n: number, digits = 3): string {
 export function MeasurePanel() {
   const points = useNavmapStore((s) => s.measurePoints)
   const factor = useNavmapStore((s) => s.metersPerViewerUnit)
-  const setFactor = useNavmapStore((s) => s.setMetersPerViewerUnit)
+  const samples = useNavmapStore((s) => s.calibrationSamples)
+  const transform = useNavmapStore((s) => s.transform)
+  const geometry = useNavmapStore((s) => s.pointCloudGeometry)
+  const addCalibrationSample = useNavmapStore((s) => s.addCalibrationSample)
+  const removeCalibrationSample = useNavmapStore((s) => s.removeCalibrationSample)
+  const clearCalibration = useNavmapStore((s) => s.clearCalibration)
   const clearMeasure = useNavmapStore((s) => s.clearMeasure)
   const setStatus = useNavmapStore((s) => s.setStatus)
   const [realInput, setRealInput] = useState('')
@@ -23,20 +29,32 @@ export function MeasurePanel() {
 
   const distMeters = distViewer != null && factor != null ? distViewer * factor : null
 
-  const calibrate = () => {
+  const modelDims = useMemo(() => {
+    if (factor == null || !geometry?.boundingBox) return null
+    const bb = geometry.boundingBox
+    return {
+      x: (bb.max.x - bb.min.x) * factor,
+      y: (bb.max.y - bb.min.y) * factor,
+      z: (bb.max.z - bb.min.z) * factor,
+    }
+  }, [factor, geometry])
+
+  const addSample = () => {
     const real = parseFloat(realInput.replace(',', '.'))
     if (!isFinite(real) || real <= 0 || distViewer == null || distViewer < 1e-9) {
       setStatus('Valor inválido para calibración.')
       return
     }
-    const f = real / distViewer
-    setFactor(f)
-    setStatus(`Calibración guardada: ${formatNumber(f, 6)} m por unidad visor.`)
-    setRealInput('')
+    const sample = addCalibrationSample(real)
+    if (sample) {
+      const n = useNavmapStore.getState().calibrationSamples.length
+      setStatus(`Muestra agregada (${n} en total). Medí otra distancia para mejorar el ajuste.`)
+      setRealInput('')
+    }
   }
 
   const reset = () => {
-    setFactor(null)
+    clearCalibration()
     setStatus('Calibración eliminada.')
   }
 
@@ -62,7 +80,8 @@ export function MeasurePanel() {
 
       {points.length === 0 && (
         <div className="text-[11px] text-muted">
-          Modo Medir activo: clickeá dos puntos en el modelo.
+          Modo Medir activo: clickeá dos puntos en el modelo. Cuantas más mediciones cargues
+          (mejor si son largas), más preciso el ajuste.
         </div>
       )}
       {points.length === 1 && (
@@ -95,11 +114,56 @@ export function MeasurePanel() {
           />
           <button
             type="button"
-            onClick={calibrate}
-            className="rounded-md border border-accent-blue/60 bg-accent-blue/15 px-2.5 py-1 text-xs text-text hover:bg-accent-blue/25"
+            onClick={addSample}
+            className="shrink-0 rounded-md border border-accent-blue/60 bg-accent-blue/15 px-2.5 py-1 text-xs text-text hover:bg-accent-blue/25"
           >
-            Calibrar
+            + Muestra
           </button>
+        </div>
+      )}
+
+      {samples.length > 0 && factor != null && (
+        <div className="space-y-1 border-t border-border pt-2">
+          <div className="text-[10px] uppercase tracking-wider text-muted">
+            Muestras ({samples.length})
+          </div>
+          {samples.map((s, i) => {
+            const residual = sampleResidual(s, transform, factor) * 100
+            const bad = Math.abs(residual) > 3
+            return (
+              <div key={s.id} className="group flex items-center gap-2 font-mono text-[11px]">
+                <span className="text-muted">#{i + 1}</span>
+                <span className="flex-1 text-text">{formatNumber(s.realMeters, 2)} m</span>
+                <span
+                  className={bad ? 'text-accent-red' : 'text-muted'}
+                  title={
+                    bad
+                      ? 'Esta muestra difiere mucho del ajuste: revisá la medición.'
+                      : 'Desvío respecto del ajuste global.'
+                  }
+                >
+                  {residual >= 0 ? '+' : ''}
+                  {formatNumber(residual, 1)}%
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    removeCalibrationSample(s.id)
+                    setStatus('Muestra eliminada; factor recalculado.')
+                  }}
+                  className="rounded px-1 text-muted opacity-0 hover:bg-accent-red/15 hover:text-accent-red group-hover:opacity-100"
+                  title="Eliminar muestra"
+                >
+                  ×
+                </button>
+              </div>
+            )
+          })}
+          {samples.length === 1 && (
+            <div className="text-[10px] text-muted">
+              Con una sola muestra no hay redundancia: agregá al menos otra para detectar errores.
+            </div>
+          )}
         </div>
       )}
 
@@ -120,6 +184,16 @@ export function MeasurePanel() {
           </button>
         )}
       </div>
+
+      {modelDims && (
+        <div className="font-mono text-[11px] text-muted">
+          Modelo: {formatNumber(modelDims.x, 1)} × {formatNumber(modelDims.y, 1)} ×{' '}
+          {formatNumber(modelDims.z, 1)} m
+          <div className="text-[10px] not-italic">
+            Si estas dimensiones no parecen reales, revisá la calibración.
+          </div>
+        </div>
+      )}
     </div>
   )
 }
