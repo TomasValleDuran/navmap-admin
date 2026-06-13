@@ -4,6 +4,7 @@ import type {
   ColmapPos,
 } from '../lib/coordTransforms'
 import { viewerToColmap } from '../lib/coordTransforms'
+import { slugify, uniqueId } from '../lib/ids'
 import { fitMetersPerViewerUnit } from '../lib/calibration'
 import { validateGraph, type ValidationIssue } from '../lib/graphValidation'
 import type {
@@ -38,8 +39,8 @@ interface NavmapState {
 
   setMode: (mode: Mode) => void
   setPendingPoint: (p: PendingPoint | null) => void
-  addPOI: (data: { name: string; type: POIType; desc: string; floor: number }) => POI | null
-  addWaypoint: (data: { label: string; floor: number }) => Waypoint | null
+  addPOI: (data: { name: string; type: POIType; desc: string; floor: number; qr?: string }) => POI | null
+  addWaypoint: (data: { label: string; floor: number; qr?: string }) => Waypoint | null
   addEdge: (from: SelectedNode, to: SelectedNode) => Edge | null
   setEdgeStart: (s: EdgeStart | null) => void
   selectNode: (s: SelectedNode | null) => void
@@ -119,6 +120,9 @@ interface NavmapState {
   mirrorY: boolean
   mirrorZ: boolean
   setMirror: (axis: 'x' | 'y' | 'z', v: boolean) => void
+
+  qrSheetOpen: boolean
+  setQrSheetOpen: (v: boolean) => void
 }
 
 const initialTransform: Transform = {
@@ -128,6 +132,15 @@ const initialTransform: Transform = {
   scale: 1,
   alignQ: null,
   alignQInv: null,
+}
+
+/** Every ID currently in use — node IDs must be unique across POIs, waypoints and anchors. */
+function existingIds(state: NavmapState): Set<string> {
+  return new Set<string>([
+    ...state.pois.map((p) => p.id),
+    ...state.waypoints.map((w) => w.id),
+    ...state.anchors.map((a) => a.id),
+  ])
 }
 
 function nodeCoords(state: NavmapState, ref: SelectedNode): { x: number; y: number; z: number } | null {
@@ -179,6 +192,9 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
           ? { mirrorY: v }
           : { mirrorZ: v },
     ),
+
+  qrSheetOpen: false,
+  setQrSheetOpen: (qrSheetOpen) => set({ qrSheetOpen }),
 
   setMode: (mode) =>
     set((s) => ({
@@ -232,11 +248,13 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
   clearCalibration: () => set({ calibrationSamples: [], metersPerViewerUnit: null }),
 
   addAnchor: ({ label, desc, floor }) => {
-    const p = get().pendingPoint
+    const state = get()
+    const p = state.pendingPoint
     if (!p) return null
+    const resolvedLabel = label || `ANCLA-${state.anchors.length + 1}`
     const anchor: AnchorPoint = {
-      id: `anchor_${Date.now()}`,
-      label: label || `ANCLA-${get().anchors.length + 1}`,
+      id: uniqueId(slugify(resolvedLabel) || 'anchor', existingIds(state)),
+      label: resolvedLabel,
       desc,
       floor,
       x: p.x,
@@ -269,15 +287,17 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
 
   setPendingPoint: (pendingPoint) => set({ pendingPoint }),
 
-  addPOI: ({ name, type, desc, floor }) => {
-    const p = get().pendingPoint
+  addPOI: ({ name, type, desc, floor, qr }) => {
+    const state = get()
+    const p = state.pendingPoint
     if (!p) return null
     const poi: POI = {
-      id: `poi_${Date.now()}`,
+      id: uniqueId(slugify(name) || 'poi', existingIds(state)),
       name,
       type,
       desc,
       floor,
+      qr: qr?.trim() || undefined,
       x: p.x,
       y: p.y,
       z: p.z,
@@ -286,13 +306,16 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
     return poi
   },
 
-  addWaypoint: ({ label, floor }) => {
-    const p = get().pendingPoint
+  addWaypoint: ({ label, floor, qr }) => {
+    const state = get()
+    const p = state.pendingPoint
     if (!p) return null
+    const resolvedLabel = label || `WP-${state.waypoints.length + 1}`
     const wp: Waypoint = {
-      id: `wp_${Date.now()}`,
-      label: label || `WP-${get().waypoints.length + 1}`,
+      id: uniqueId(slugify(resolvedLabel) || 'wp', existingIds(state)),
+      label: resolvedLabel,
       floor,
+      qr: qr?.trim() || undefined,
       x: p.x,
       y: p.y,
       z: p.z,

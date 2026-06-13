@@ -27,6 +27,8 @@ export interface POI {
   type: POIType
   desc: string
   floor: number
+  /** Optional QR payload printed on a wall. Empty → the AR app matches the node id. */
+  qr?: string
   x: number
   y: number
   z: number
@@ -36,6 +38,8 @@ export interface Waypoint {
   id: string
   label: string
   floor: number
+  /** Optional QR payload printed on a wall. Empty → the AR app matches the node id. */
+  qr?: string
   x: number
   y: number
   z: number

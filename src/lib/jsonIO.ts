@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { colmapToViewer } from './coordTransforms'
 import type {
   AnchorPoint,
   CalibrationSample,
@@ -53,6 +54,18 @@ export function exportToJSON(input: ExportInput): string {
     calibrated ? { x: x * scaleM, y: y * scaleM, z: z * scaleM } : null
   const toWorldPos = (x: number, y: number, z: number) =>
     calibrated ? { x: x * scaleM * mx, y: y * scaleM * my, z: z * scaleM * mz } : null
+  // AR-ready coordinates: meters, floor-aligned (alignQ applied), Y-up, mirror baked in.
+  // This is the field the ARCore app consumes directly — no scale/flip/mirror on device.
+  // See apps/FORMAT.md. Null when uncalibrated (metric AR needs a known scale).
+  const toArPos = (x: number, y: number, z: number) => {
+    if (!calibrated || metersPerViewerUnit == null) return null
+    const v = colmapToViewer(x, y, z, transform)
+    return {
+      x: v.vx * metersPerViewerUnit * mx,
+      y: v.vy * metersPerViewerUnit * my,
+      z: v.vz * metersPerViewerUnit * mz,
+    }
+  }
 
   const data = {
     version: '2.0' as const,
@@ -74,6 +87,9 @@ export function exportToJSON(input: ExportInput): string {
       mirror_x: mirrorX,
       mirror_y: mirrorY,
       mirror_z: mirrorZ,
+      // Building heading: degrees to pre-rotate the graph about the vertical axis so
+      // paths line up with real hallways. 0 until the AR app saves a measured value.
+      ar_hints: { default_rotation_deg: 0 },
       calibration_samples: calibrationSamples.map((s) => ({
         id: s.id,
         a: s.a,
@@ -89,6 +105,7 @@ export function exportToJSON(input: ExportInput): string {
       position: { x: a.x, y: a.y, z: a.z },
       position_m: toMetersPos(a.x, a.y, a.z),
       position_world_m: toWorldPos(a.x, a.y, a.z),
+      position_ar: toArPos(a.x, a.y, a.z),
     })),
     nodes: [
       ...pois.map((p) => ({
@@ -98,18 +115,22 @@ export function exportToJSON(input: ExportInput): string {
         poi_type: p.type,
         description: p.desc,
         floor: p.floor,
+        qr: p.qr ?? null,
         position: { x: p.x, y: p.y, z: p.z },
         position_m: toMetersPos(p.x, p.y, p.z),
         position_world_m: toWorldPos(p.x, p.y, p.z),
+        position_ar: toArPos(p.x, p.y, p.z),
       })),
       ...waypoints.map((w) => ({
         id: w.id,
         node_type: 'waypoint' as const,
         label: w.label,
         floor: w.floor,
+        qr: w.qr ?? null,
         position: { x: w.x, y: w.y, z: w.z },
         position_m: toMetersPos(w.x, w.y, w.z),
         position_world_m: toWorldPos(w.x, w.y, w.z),
+        position_ar: toArPos(w.x, w.y, w.z),
       })),
     ],
     edges: edges.map((e) => ({
@@ -151,6 +172,7 @@ interface V2Node {
   description?: string
   label?: string
   floor?: number
+  qr?: string | null
 }
 
 interface V2Edge {
@@ -220,7 +242,7 @@ export function parseImportJSON(text: string): ImportResult {
     throw new Error('JSON no reconocido')
   }
 
-  if (data.version === '2.0' && data.nodes) {
+  if (data.version?.startsWith('2') && data.nodes) {
     const pois: POI[] = []
     const waypoints: Waypoint[] = []
     for (const n of data.nodes) {
@@ -232,6 +254,7 @@ export function parseImportJSON(text: string): ImportResult {
           type: n.poi_type ?? 'other',
           desc: n.description ?? '',
           floor: n.floor ?? 0,
+          qr: n.qr ?? undefined,
           x: p.x, y: p.y, z: p.z,
         })
       } else {
@@ -239,6 +262,7 @@ export function parseImportJSON(text: string): ImportResult {
           id: n.id,
           label: n.label ?? 'WP',
           floor: n.floor ?? 0,
+          qr: n.qr ?? undefined,
           x: p.x, y: p.y, z: p.z,
         })
       }

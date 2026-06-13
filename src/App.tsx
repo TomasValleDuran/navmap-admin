@@ -8,6 +8,7 @@ import { POIModal } from './ui/modals/POIModal'
 import { WaypointModal } from './ui/modals/WaypointModal'
 import { AnchorModal } from './ui/modals/AnchorModal'
 import { EditNodeModal } from './ui/modals/EditNodeModal'
+import { QRSheet } from './ui/QRSheet'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 
 const MIN_PANEL_WIDTH = 200
@@ -104,6 +105,7 @@ export default function App() {
       <WaypointModal />
       <AnchorModal />
       <EditNodeModal />
+      <QRSheet />
     </div>
   )
 }

@@ -37,26 +37,28 @@ export function EditNodeModal() {
   const [desc, setDesc] = useState('')
   const [label, setLabel] = useState('')
   const [floor, setFloor] = useState(0)
+  const [qr, setQr] = useState('')
 
   useEffect(() => {
     if (!node || !editingNode) return
     if (editingNode.nodeType === 'poi') {
       const p = node as (typeof pois)[number]
-      setName(p.name); setType(p.type); setDesc(p.desc); setFloor(p.floor)
+      setName(p.name); setType(p.type); setDesc(p.desc); setFloor(p.floor); setQr(p.qr ?? '')
     } else {
       const w = node as (typeof waypoints)[number]
-      setLabel(w.label); setFloor(w.floor)
+      setLabel(w.label); setFloor(w.floor); setQr(w.qr ?? '')
     }
   }, [editingNode, node, pois, waypoints])
 
   if (!open || !node || !editingNode) return null
 
   const confirm = () => {
+    const qrValue = qr.trim() || undefined
     if (editingNode.nodeType === 'poi') {
-      editPOI(editingNode.id, { name: name.trim() || 'POI', type, desc: desc.trim(), floor })
+      editPOI(editingNode.id, { name: name.trim() || 'POI', type, desc: desc.trim(), floor, qr: qrValue })
       setStatus(`POI "${name}" actualizado.`)
     } else {
-      editWaypoint(editingNode.id, { label: label.trim() || 'WP', floor })
+      editWaypoint(editingNode.id, { label: label.trim() || 'WP', floor, qr: qrValue })
       setStatus(`Waypoint actualizado.`)
     }
     cancelEdit()
@@ -101,7 +103,8 @@ export function EditNodeModal() {
       }
     >
       <div className="rounded-md border border-border bg-panel-2 px-3 py-2 font-mono text-xs text-muted">
-        x: {node.x.toFixed(3)} &nbsp; y: {node.y.toFixed(3)} &nbsp; z: {node.z.toFixed(3)}
+        <div>id: {node.id}</div>
+        <div>x: {node.x.toFixed(3)} &nbsp; y: {node.y.toFixed(3)} &nbsp; z: {node.z.toFixed(3)}</div>
       </div>
       {editingNode.nodeType === 'poi' ? (
         <>
@@ -157,6 +160,15 @@ export function EditNodeModal() {
           value={floor}
           onChange={(e) => setFloor(parseInt(e.target.value || '0', 10))}
           className="w-24 rounded-md border border-border bg-panel-2 px-3 py-1.5 text-sm focus:border-accent-blue focus:outline-none"
+        />
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-xs uppercase tracking-wider text-muted">Código QR (opcional)</span>
+        <input
+          value={qr}
+          onChange={(e) => setQr(e.target.value)}
+          placeholder="Vacío = se usa el ID del nodo"
+          className="w-full rounded-md border border-border bg-panel-2 px-3 py-1.5 text-sm focus:border-accent-blue focus:outline-none"
         />
       </label>
     </ModalShell>

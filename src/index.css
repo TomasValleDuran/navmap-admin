@@ -2,6 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
+/* QR print sheet: when printing, show only the QR grid (hide the rest of the app). */
+@media print {
+  html,
+  body,
+  #root {
+    overflow: visible !important;
+    height: auto !important;
+    background: #fff !important;
+  }
+  body * {
+    visibility: hidden !important;
+  }
+  .qr-print-root,
+  .qr-print-root * {
+    visibility: visible !important;
+  }
+  .qr-print-root {
+    position: absolute !important;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: #fff !important;
+  }
+  .qr-print-hide {
+    display: none !important;
+  }
+}
+
 html,
 body,
 #root {

@@ -24,6 +24,7 @@ export interface ValidationInput {
 interface GraphNode {
   id: string
   label: string
+  qr?: string
   x: number
   y: number
   z: number
@@ -32,10 +33,62 @@ interface GraphNode {
 export function validateGraph(input: ValidationInput): ValidationIssue[] {
   const issues: ValidationIssue[] = []
   const nodes: GraphNode[] = [
-    ...input.pois.map((p) => ({ id: p.id, label: p.name, x: p.x, y: p.y, z: p.z })),
-    ...input.waypoints.map((w) => ({ id: w.id, label: w.label, x: w.x, y: w.y, z: w.z })),
+    ...input.pois.map((p) => ({ id: p.id, label: p.name, qr: p.qr, x: p.x, y: p.y, z: p.z })),
+    ...input.waypoints.map((w) => ({ id: w.id, label: w.label, qr: w.qr, x: w.x, y: w.y, z: w.z })),
   ]
   const byId = new Map(nodes.map((n) => [n.id, n]))
+
+  // ── Identity checks: edges and QR scans both resolve nodes by these strings ──
+  const idGroups = new Map<string, GraphNode[]>()
+  for (const n of nodes) {
+    const g = idGroups.get(n.id) ?? []
+    g.push(n)
+    idGroups.set(n.id, g)
+  }
+  for (const [id, group] of idGroups) {
+    if (group.length > 1) {
+      issues.push({
+        severity: 'warn',
+        nodeId: id,
+        message: `ID duplicado "${id}" en ${group.length} nodos (${group
+          .map((n) => n.label)
+          .join(', ')}). Los IDs deben ser únicos.`,
+      })
+    }
+  }
+
+  const qrGroups = new Map<string, GraphNode[]>()
+  for (const n of nodes) {
+    if (!n.qr) continue
+    const g = qrGroups.get(n.qr) ?? []
+    g.push(n)
+    qrGroups.set(n.qr, g)
+  }
+  for (const [qr, group] of qrGroups) {
+    if (group.length > 1) {
+      issues.push({
+        severity: 'warn',
+        nodeId: group[0].id,
+        message: `Código QR "${qr}" repetido en ${group.length} nodos (${group
+          .map((n) => n.label)
+          .join(', ')}). Al escanearlo, la app no sabría a cuál corresponde.`,
+      })
+    }
+  }
+
+  // A QR payload equal to a *different* node's ID resolves to that node (the app
+  // matches IDs before QR fields), so the scan would land on the wrong node.
+  for (const n of nodes) {
+    if (!n.qr || n.qr === n.id) continue
+    const clash = byId.get(n.qr)
+    if (clash && clash.id !== n.id) {
+      issues.push({
+        severity: 'warn',
+        nodeId: n.id,
+        message: `El código QR "${n.qr}" de "${n.label}" coincide con el ID del nodo "${clash.label}". La app lo resolvería al nodo equivocado.`,
+      })
+    }
+  }
 
   if (input.metersPerViewerUnit == null) {
     issues.push({

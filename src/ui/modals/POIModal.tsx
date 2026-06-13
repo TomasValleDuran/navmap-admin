@@ -28,6 +28,7 @@ export function POIModal() {
   const [type, setType] = useState<POIType>('other')
   const [desc, setDesc] = useState('')
   const [floor, setFloor] = useState(0)
+  const [qr, setQr] = useState('')
 
   useEffect(() => {
     if (open) {
@@ -35,13 +36,14 @@ export function POIModal() {
       setType('other')
       setDesc('')
       setFloor(0)
+      setQr('')
     }
   }, [open])
 
   const close = () => setPendingPoint(null)
   const confirm = () => {
-    const poi = addPOI({ name: name.trim() || 'POI', type, desc: desc.trim(), floor })
-    if (poi) setStatus(`POI "${poi.name}" agregado.`)
+    const poi = addPOI({ name: name.trim() || 'POI', type, desc: desc.trim(), floor, qr })
+    if (poi) setStatus(`POI "${poi.name}" agregado (id: ${poi.id}).`)
   }
 
   return (
@@ -111,6 +113,14 @@ export function POIModal() {
           value={floor}
           onChange={(e) => setFloor(parseInt(e.target.value || '0', 10))}
           className="w-24 rounded-md border border-border bg-panel-2 px-3 py-1.5 text-sm focus:border-accent-blue focus:outline-none"
+        />
+      </Field>
+      <Field label="Código QR (opcional)">
+        <input
+          value={qr}
+          onChange={(e) => setQr(e.target.value)}
+          className="w-full rounded-md border border-border bg-panel-2 px-3 py-1.5 text-sm focus:border-accent-blue focus:outline-none"
+          placeholder="Vacío = se usa el ID del nodo"
         />
       </Field>
     </ModalShell>

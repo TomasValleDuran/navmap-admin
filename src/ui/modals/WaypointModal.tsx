@@ -13,18 +13,20 @@ export function WaypointModal() {
 
   const [label, setLabel] = useState('')
   const [floor, setFloor] = useState(0)
+  const [qr, setQr] = useState('')
 
   useEffect(() => {
     if (open) {
       setLabel('')
       setFloor(0)
+      setQr('')
     }
   }, [open])
 
   const close = () => setPendingPoint(null)
   const confirm = () => {
-    const wp = addWaypoint({ label: label.trim(), floor })
-    if (wp) setStatus(`Waypoint "${wp.label}" agregado.`)
+    const wp = addWaypoint({ label: label.trim(), floor, qr })
+    if (wp) setStatus(`Waypoint "${wp.label}" agregado (id: ${wp.id}).`)
   }
 
   return (
@@ -76,6 +78,15 @@ export function WaypointModal() {
           value={floor}
           onChange={(e) => setFloor(parseInt(e.target.value || '0', 10))}
           className="w-24 rounded-md border border-border bg-panel-2 px-3 py-1.5 text-sm focus:border-accent-green focus:outline-none"
+        />
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-xs uppercase tracking-wider text-muted">Código QR (opcional)</span>
+        <input
+          value={qr}
+          onChange={(e) => setQr(e.target.value)}
+          placeholder="Vacío = se usa el ID del nodo"
+          className="w-full rounded-md border border-border bg-panel-2 px-3 py-1.5 text-sm focus:border-accent-green focus:outline-none"
         />
       </label>
     </ModalShell>
