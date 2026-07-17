@@ -2,6 +2,7 @@ import { ArrowDownToLine, RefreshCw, RotateCcw, RotateCw } from 'lucide-react'
 import { useNavmapStore } from '../store/useNavmapStore'
 import { nudgeFloorTilt, realignFloorInPlace } from '../lib/realignFloor'
 import { colmapToViewer, viewerToColmap } from '../lib/coordTransforms'
+import { SliderWithNumber } from './components/SliderWithNumber'
 
 export function FloorControls() {
   const modelLoaded = useNavmapStore((s) => s.modelLoaded)
@@ -10,8 +11,10 @@ export function FloorControls() {
   const modelRadius = useNavmapStore((s) => s.modelRadius)
   const setFloorLock = useNavmapStore((s) => s.setFloorLock)
   const setFloorHeightViewer = useNavmapStore((s) => s.setFloorHeightViewer)
-
-  if (!modelLoaded) return null
+  const floors = useNavmapStore((s) => s.floors)
+  const activeFloorId = useNavmapStore((s) => s.activeFloorId)
+  const setFloorMeta = useNavmapStore((s) => s.setFloorMeta)
+  const active = floors.find((f) => f.id === activeFloorId)
 
   const span = Math.max(modelRadius, 2)
 
@@ -49,18 +52,50 @@ export function FloorControls() {
       const c = viewerToColmap(v.vx, s.floorHeightViewer, v.vz, s.transform)
       return { ...w, x: c.x, y: c.y, z: c.z }
     })
-    s.importState({
-      pois: updatedPOIs,
-      waypoints: updatedWPs,
-      edges: s.edges,
-      floorHeightViewer: s.floorHeightViewer,
-    })
+    s.updateActiveFloor({ pois: updatedPOIs, waypoints: updatedWPs })
     s.setStatus('Nodos nivelados al plano del piso.')
   }
 
   return (
+    <>
+      {active && (
+        <div className="space-y-2 rounded-lg border border-border bg-panel-2 p-3">
+          <div className="text-xs font-medium uppercase tracking-wider text-muted">
+            {active.name}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="font-mono text-[11px] text-muted">
+              Nivel
+              <input
+                type="number"
+                step={1}
+                value={active.level}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10)
+                  if (Number.isFinite(v)) setFloorMeta(active.id, { level: v })
+                }}
+                className="mt-0.5 w-full rounded-md border border-border bg-panel px-2 py-1 text-xs text-text outline-none focus:border-accent-blue/60"
+              />
+            </label>
+            <label className="font-mono text-[11px] text-muted">
+              Elevación (m)
+              <input
+                type="number"
+                step={0.1}
+                value={active.elevation_m}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value)
+                  if (Number.isFinite(v)) setFloorMeta(active.id, { elevation_m: v })
+                }}
+                className="mt-0.5 w-full rounded-md border border-border bg-panel px-2 py-1 text-xs text-text outline-none focus:border-accent-blue/60"
+              />
+            </label>
+          </div>
+        </div>
+      )}
+      {modelLoaded && (
     <div className="space-y-3 rounded-lg border border-border bg-panel-2 p-3">
-      <div className="text-xs font-medium uppercase tracking-wider text-muted">Piso</div>
+      <div className="text-xs font-medium uppercase tracking-wider text-muted">Alineación del piso</div>
       <label className="flex items-center gap-2 text-sm text-text">
         <input
           type="checkbox"
@@ -70,21 +105,15 @@ export function FloorControls() {
         />
         Marcar en piso (ignorar nube)
       </label>
-      <div>
-        <div className="mb-1 flex items-center justify-between font-mono text-xs text-muted">
-          <span>Altura piso</span>
-          <span>Y: {floorHeightViewer.toFixed(3)}</span>
-        </div>
-        <input
-          type="range"
-          min={-span}
-          max={span}
-          step={span / 200}
-          value={floorHeightViewer}
-          onChange={(e) => setFloorHeightViewer(parseFloat(e.target.value))}
-          className="w-full accent-accent-green"
-        />
-      </div>
+      <SliderWithNumber
+        label="Altura piso"
+        value={floorHeightViewer}
+        onChange={setFloorHeightViewer}
+        min={-span}
+        max={span}
+        step={span / 200}
+        precision={3}
+      />
       <div className="space-y-2 border-t border-border pt-2">
         <div className="text-[10px] uppercase tracking-wider text-muted">Inclinación manual</div>
         <div className="grid grid-cols-2 gap-1.5">
@@ -113,6 +142,8 @@ export function FloorControls() {
         </button>
       </div>
     </div>
+      )}
+    </>
   )
 }
 

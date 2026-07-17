@@ -22,6 +22,7 @@ export function Marker({ node, nodeType }: Props) {
   const mirrorY = useNavmapStore((s) => s.mirrorY)
   const selectedNode = useNavmapStore((s) => s.selectedNode)
   const edgeStart = useNavmapStore((s) => s.edgeStart)
+  const connectStart = useNavmapStore((s) => s.connectStart)
 
   const { vx, vy, vz } = useMemo(
     () => colmapToViewer(node.x, node.y, node.z, transform),
@@ -41,7 +42,8 @@ export function Marker({ node, nodeType }: Props) {
 
   const isSelected = selectedNode?.id === node.id
   const isEdgeStart = edgeStart?.id === node.id
-  const emissiveIntensity = isSelected ? 0.7 : isEdgeStart ? 0.6 : 0.15
+  const isConnectStart = connectStart?.id === node.id
+  const emissiveIntensity = isSelected ? 0.7 : isEdgeStart || isConnectStart ? 0.6 : 0.15
 
   const onClick = (e: { stopPropagation: () => void }) => {
     e.stopPropagation()
@@ -64,12 +66,31 @@ export function Marker({ node, nodeType }: Props) {
             : 'Conexión duplicada o inválida.',
         )
       }
+    } else if (s.mode === 'connect-floors') {
+      const active = s.floors.find((f) => f.id === s.activeFloorId)
+      if (!s.connectStart) {
+        s.setConnectStart({
+          id: node.id,
+          nodeType,
+          floorId: s.activeFloorId,
+          level: active?.level ?? 0,
+        })
+        s.setStatus('Primer extremo elegido. Cambiá de piso y seleccioná el segundo nodo.')
+      } else if (s.connectStart.id === node.id) {
+        s.setConnectStart(null)
+        s.setStatus('Conexión entre pisos cancelada.')
+      } else if (s.connectStart.floorId === s.activeFloorId) {
+        s.setStatus('El segundo extremo debe estar en otro piso. Cambiá de piso primero.')
+      } else {
+        // second endpoint on another floor → ConnectionModal opens from this selection
+        s.selectNode({ id: node.id, nodeType })
+      }
     }
   }
 
   const cursor = (() => {
     const m = useNavmapStore.getState().mode
-    return m === 'select' || m === 'edge' ? 'pointer' : 'default'
+    return m === 'select' || m === 'edge' || m === 'connect-floors' ? 'pointer' : 'default'
   })()
 
   return (

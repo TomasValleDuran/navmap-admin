@@ -21,13 +21,13 @@ export function POIModal() {
   const setPendingPoint = useNavmapStore((s) => s.setPendingPoint)
   const addPOI = useNavmapStore((s) => s.addPOI)
   const setStatus = useNavmapStore((s) => s.setStatus)
+  const activeFloor = useNavmapStore((s) => s.floors.find((f) => f.id === s.activeFloorId))
 
   const open = !!pendingPoint && mode === 'poi'
 
   const [name, setName] = useState('')
   const [type, setType] = useState<POIType>('other')
   const [desc, setDesc] = useState('')
-  const [floor, setFloor] = useState(0)
   const [qr, setQr] = useState('')
 
   useEffect(() => {
@@ -35,14 +35,13 @@ export function POIModal() {
       setName('')
       setType('other')
       setDesc('')
-      setFloor(0)
       setQr('')
     }
   }, [open])
 
   const close = () => setPendingPoint(null)
   const confirm = () => {
-    const poi = addPOI({ name: name.trim() || 'POI', type, desc: desc.trim(), floor, qr })
+    const poi = addPOI({ name: name.trim() || 'POI', type, desc: desc.trim(), floor: activeFloor?.level ?? 0, qr })
     if (poi) setStatus(`POI "${poi.name}" agregado (id: ${poi.id}).`)
   }
 
@@ -106,14 +105,9 @@ export function POIModal() {
         />
       </Field>
       <Field label="Piso">
-        <input
-          type="number"
-          min={-5}
-          max={50}
-          value={floor}
-          onChange={(e) => setFloor(parseInt(e.target.value || '0', 10))}
-          className="w-24 rounded-md border border-border bg-panel-2 px-3 py-1.5 text-sm focus:border-accent-blue focus:outline-none"
-        />
+        <div className="rounded-md border border-border bg-panel-2 px-3 py-1.5 text-sm text-muted">
+          {activeFloor ? `${activeFloor.name} (nivel ${activeFloor.level})` : '—'}
+        </div>
       </Field>
       <Field label="Código QR (opcional)">
         <input

@@ -1,5 +1,6 @@
 import { ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { FloorControls } from './FloorControls'
+import { RoutePreviewPanel } from './RoutePreviewPanel'
 import { SelectedNodeInfo } from './SelectedNodeInfo'
 import { StatsCards } from './StatsCards'
 
@@ -42,6 +43,7 @@ export function RightPanel({ width, collapsed, onToggle }: Props) {
       <StatsCards />
       <SelectedNodeInfo />
       <FloorControls />
+      <RoutePreviewPanel />
     </aside>
   )
 }

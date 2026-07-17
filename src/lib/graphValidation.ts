@@ -1,6 +1,16 @@
 import * as THREE from 'three'
 import { colmapToViewer } from './coordTransforms'
-import type { AnchorPoint, Edge, POI, Transform, Waypoint } from '../types/navmap'
+import { connectionCost } from './routing'
+import type {
+  AnchorPoint,
+  Edge,
+  Floor,
+  FloorConnection,
+  POI,
+  RoutingProfiles,
+  Transform,
+  Waypoint,
+} from '../types/navmap'
 
 export interface ValidationIssue {
   severity: 'warn' | 'info'
@@ -135,6 +145,112 @@ export function validateGraph(input: ValidationInput): ValidationIssue[] {
   }
 
   return issues
+}
+
+/**
+ * Building-wide checks across floors and cross-floor connections (the per-floor `validateGraph`
+ * only sees the active floor). `loadedFloorIds` are the floors whose point cloud is loaded.
+ */
+export function validateBuilding(input: {
+  floors: Floor[]
+  connections: FloorConnection[]
+  routingProfiles: RoutingProfiles
+  loadedFloorIds: Set<string>
+}): ValidationIssue[] {
+  const issues: ValidationIssue[] = []
+  const { floors, connections, routingProfiles, loadedFloorIds } = input
+
+  // index every node by id and remember which floor level it sits on
+  const nodeFloor = new Map<string, number>()
+  for (const f of floors) {
+    for (const p of f.pois) nodeFloor.set(p.id, f.level)
+    for (const w of f.waypoints) nodeFloor.set(w.id, f.level)
+  }
+
+  // floors missing a calibration / cloud
+  for (const f of floors) {
+    if (!loadedFloorIds.has(f.id)) {
+      issues.push({ severity: 'info', message: `El piso "${f.name}" no tiene nube cargada.` })
+    } else if (f.metersPerViewerUnit == null) {
+      issues.push({
+        severity: 'warn',
+        message: `El piso "${f.name}" no está calibrado: sus distancias no estarán en metros.`,
+      })
+    }
+  }
+
+  // connections must reference existing nodes
+  for (const c of connections) {
+    if (!nodeFloor.has(c.from) || !nodeFloor.has(c.to)) {
+      issues.push({
+        severity: 'warn',
+        message: `La conexión ${c.id} (${c.kind}) referencia un nodo inexistente.`,
+      })
+    }
+  }
+
+  if (floors.length > 1) {
+    // every floor should be linked to the rest by at least one connection
+    const linkedLevels = new Set<number>()
+    for (const c of connections) {
+      linkedLevels.add(c.floorFrom)
+      linkedLevels.add(c.floorTo)
+    }
+    for (const f of floors) {
+      if (!linkedLevels.has(f.level)) {
+        issues.push({
+          severity: 'warn',
+          message: `El piso "${f.name}" no tiene ninguna conexión (escaleras/ascensor) con otros pisos.`,
+        })
+      }
+    }
+
+    // accessible reachability: which floor levels are reachable step-free from the lowest floor
+    const reachable = accessibleReachableLevels(floors, connections, routingProfiles)
+    if (reachable) {
+      for (const f of floors) {
+        if (!reachable.has(f.level)) {
+          issues.push({
+            severity: 'warn',
+            message: `El piso "${f.name}" no es accesible sin escaleras (falta ascensor/rampa en la ruta).`,
+          })
+        }
+      }
+    }
+  }
+
+  return issues
+}
+
+/** Levels reachable from the lowest floor using only accessible connections, or null if empty. */
+function accessibleReachableLevels(
+  floors: Floor[],
+  connections: FloorConnection[],
+  profiles: RoutingProfiles,
+): Set<number> | null {
+  const levels = floors.map((f) => f.level)
+  if (!levels.length) return null
+  const start = Math.min(...levels)
+  // graph over floor *levels*, joined only by connections the accessible profile keeps
+  const adj = new Map<number, number[]>()
+  for (const l of levels) adj.set(l, [])
+  for (const c of connections) {
+    if (connectionCost(profiles.accessible, c) == null) continue
+    adj.get(c.floorFrom)?.push(c.floorTo)
+    adj.get(c.floorTo)?.push(c.floorFrom)
+  }
+  const seen = new Set<number>([start])
+  const stack = [start]
+  while (stack.length) {
+    const u = stack.pop()!
+    for (const v of adj.get(u) ?? []) {
+      if (!seen.has(v)) {
+        seen.add(v)
+        stack.push(v)
+      }
+    }
+  }
+  return seen
 }
 
 function countComponents(nodes: GraphNode[], edges: Edge[]): number {

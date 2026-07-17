@@ -25,26 +25,20 @@ export function Header() {
   const performExport = () => {
     const s = useNavmapStore.getState()
     downloadJSON({
-      pois: s.pois,
-      waypoints: s.waypoints,
-      edges: s.edges,
-      anchors: s.anchors,
-      calibrationSamples: s.calibrationSamples,
-      transform: s.transform,
-      floorHeightViewer: s.floorHeightViewer,
-      metersPerViewerUnit: s.metersPerViewerUnit,
-      mirrorX: s.mirrorX,
-      mirrorY: s.mirrorY,
-      mirrorZ: s.mirrorZ,
+      floors: s.floors,
+      connections: s.connections,
+      routingProfiles: s.routingProfiles,
     })
+    const totalNodes = s.floors.reduce((n, f) => n + f.pois.length + f.waypoints.length, 0)
     setStatus(
-      `Exportado: ${s.pois.length} POIs · ${s.waypoints.length} WPs · ${s.edges.length} edges · ${s.anchors.length} anclas.`,
+      `Exportado: ${s.floors.length} pisos · ${totalNodes} nodos · ${s.connections.length} conexiones.`,
     )
   }
 
   const onExport = () => {
     const s = useNavmapStore.getState()
-    if (!s.pois.length && !s.waypoints.length) {
+    const totalNodes = s.floors.reduce((n, f) => n + f.pois.length + f.waypoints.length, 0)
+    if (totalNodes === 0) {
       setNotice({ title: 'Nada para exportar', message: 'Agregá POIs o waypoints primero.' })
       return
     }
@@ -62,25 +56,23 @@ export function Header() {
       const text = await file.text()
       const r = parseImportJSON(text)
       importState({
-        pois: r.pois,
-        waypoints: r.waypoints,
-        edges: r.edges,
-        anchors: r.anchors,
-        calibrationSamples: r.calibrationSamples,
-        transform: r.transform,
-        floorHeightViewer: r.floorHeightViewer,
-        metersPerViewerUnit: r.metersPerViewerUnit,
-        mirrorX: r.mirrorX,
-        mirrorY: r.mirrorY,
-        mirrorZ: r.mirrorZ,
+        floors: r.floors,
+        connections: r.connections,
+        routingProfiles: r.routingProfiles,
       })
+      const totalNodes = r.floors.reduce((n, f) => n + f.pois.length + f.waypoints.length, 0)
       setStatus(
-        `Importado (v${r.version}): ${r.pois.length} POIs · ${r.waypoints.length} WPs · ${r.edges.length} edges.`,
+        `Importado (v${r.version}): ${r.floors.length} pisos · ${totalNodes} nodos · ${r.connections.length} conexiones.`,
       )
-      if (r.version === '1') {
+      if (r.version !== '3.0') {
         setNotice({
-          title: 'Importación parcial',
-          message: 'Formato v1 importado parcialmente (sin coordenadas originales COLMAP).',
+          title: 'Mapa migrado',
+          message: `Archivo v${r.version} importado como un solo piso. Volvé a cargar el .PLY de cada piso y re-exportá como v3.0.`,
+        })
+      } else {
+        setNotice({
+          title: 'Recargá las nubes',
+          message: 'Anotaciones importadas. Cargá el .PLY de cada piso para volver a ver las nubes de puntos.',
         })
       }
     } catch (err) {
@@ -97,7 +89,7 @@ export function Header() {
         <span className="rounded bg-accent-blue/15 px-2 py-0.5 font-mono text-xs uppercase tracking-wider text-accent-blue">
           NavMap Admin
         </span>
-        <span className="text-xs text-muted">v2 · react</span>
+        <span className="text-xs text-muted">v3 · react</span>
       </div>
       <div className="flex items-center gap-2">
         <HeaderButton onClick={() => plyInputRef.current?.click()} Icon={FileUp} label="Cargar .PLY" />

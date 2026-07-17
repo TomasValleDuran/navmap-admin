@@ -8,6 +8,7 @@ import { POIModal } from './ui/modals/POIModal'
 import { WaypointModal } from './ui/modals/WaypointModal'
 import { AnchorModal } from './ui/modals/AnchorModal'
 import { EditNodeModal } from './ui/modals/EditNodeModal'
+import { ConnectionModal } from './ui/modals/ConnectionModal'
 import { QRSheet } from './ui/QRSheet'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 
@@ -105,6 +106,7 @@ export default function App() {
       <WaypointModal />
       <AnchorModal />
       <EditNodeModal />
+      <ConnectionModal />
       <QRSheet />
     </div>
   )

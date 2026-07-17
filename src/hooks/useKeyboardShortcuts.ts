@@ -11,6 +11,7 @@ const MODE_KEYS: Record<string, Mode> = {
   '5': 'select',
   '6': 'measure',
   '7': 'anchor',
+  '8': 'connect-floors',
 }
 
 function isTypingTarget(el: EventTarget | null): boolean {
@@ -53,6 +54,10 @@ export function useKeyboardShortcuts() {
         if (s.edgeStart) {
           s.setEdgeStart(null)
           s.setStatus('Conexión cancelada.')
+        } else if (s.connectStart) {
+          s.setConnectStart(null)
+          s.selectNode(null)
+          s.setStatus('Conexión entre pisos cancelada.')
         } else if (s.editingNode) {
           s.cancelEdit()
         } else if (s.pendingPoint) {

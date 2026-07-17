@@ -2,7 +2,9 @@ import { ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { AnchorList } from './AnchorList'
 import { AxesPanel } from './AxesPanel'
 import { ClearAllButton } from './ClearAllButton'
+import { ConnectionList } from './ConnectionList'
 import { EdgeList } from './EdgeList'
+import { FloorBar } from './FloorBar'
 import { MeasurePanel } from './MeasurePanel'
 import { ModePicker } from './ModePicker'
 import { POIList } from './POIList'
@@ -45,12 +47,14 @@ export function Sidebar({ width, collapsed, onToggle }: Props) {
           <ChevronsLeft size={14} />
         </button>
       </div>
+      <FloorBar />
       <ModePicker />
       <MeasurePanel />
       <AxesPanel />
       <POIList />
       <WaypointList />
       <EdgeList />
+      <ConnectionList />
       <AnchorList />
       <ValidationPanel />
       <ClearAllButton />

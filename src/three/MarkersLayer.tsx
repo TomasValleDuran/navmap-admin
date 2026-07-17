@@ -1,5 +1,6 @@
 import { useNavmapStore } from '../store/useNavmapStore'
 import { AnchorMarker } from './AnchorMarker'
+import { ConnectionBadges } from './ConnectionBadges'
 import { EdgeTube } from './EdgeTube'
 import { Marker } from './Marker'
 
@@ -24,6 +25,7 @@ export function MarkersLayer() {
       {edges.map((e) => (
         <EdgeTube key={e.id} edge={e} />
       ))}
+      <ConnectionBadges />
     </group>
   )
 }

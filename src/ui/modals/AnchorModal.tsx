@@ -8,24 +8,23 @@ export function AnchorModal() {
   const setPendingPoint = useNavmapStore((s) => s.setPendingPoint)
   const addAnchor = useNavmapStore((s) => s.addAnchor)
   const setStatus = useNavmapStore((s) => s.setStatus)
+  const activeFloor = useNavmapStore((s) => s.floors.find((f) => f.id === s.activeFloorId))
 
   const open = !!pendingPoint && mode === 'anchor'
 
   const [label, setLabel] = useState('')
   const [desc, setDesc] = useState('')
-  const [floor, setFloor] = useState(0)
 
   useEffect(() => {
     if (open) {
       setLabel('')
       setDesc('')
-      setFloor(0)
     }
   }, [open])
 
   const close = () => setPendingPoint(null)
   const confirm = () => {
-    const a = addAnchor({ label: label.trim(), desc: desc.trim(), floor })
+    const a = addAnchor({ label: label.trim(), desc: desc.trim(), floor: activeFloor?.level ?? 0 })
     if (a) setStatus(`Punto de anclaje "${a.label}" agregado.`)
   }
 
@@ -86,14 +85,9 @@ export function AnchorModal() {
       </label>
       <label className="block">
         <span className="mb-1 block text-xs uppercase tracking-wider text-muted">Piso</span>
-        <input
-          type="number"
-          min={-5}
-          max={50}
-          value={floor}
-          onChange={(e) => setFloor(parseInt(e.target.value || '0', 10))}
-          className="w-24 rounded-md border border-border bg-panel-2 px-3 py-1.5 text-sm focus:border-accent-blue focus:outline-none"
-        />
+        <div className="rounded-md border border-border bg-panel-2 px-3 py-1.5 text-sm text-muted">
+          {activeFloor ? `${activeFloor.name} (nivel ${activeFloor.level})` : '—'}
+        </div>
       </label>
     </ModalShell>
   )

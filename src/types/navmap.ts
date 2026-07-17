@@ -1,6 +1,14 @@
 import * as THREE from 'three'
 
-export type Mode = 'view' | 'poi' | 'waypoint' | 'edge' | 'select' | 'measure' | 'anchor'
+export type Mode =
+  | 'view'
+  | 'poi'
+  | 'waypoint'
+  | 'edge'
+  | 'select'
+  | 'measure'
+  | 'anchor'
+  | 'connect-floors'
 
 export interface MeasurePoint {
   vx: number
@@ -98,5 +106,79 @@ export interface Transform {
   scale: number
   alignQ: THREE.Quaternion | null
   alignQInv: THREE.Quaternion | null
+}
+
+/** Kind of vertical link between two floors. */
+export type ConnectionKind = 'stairs' | 'elevator' | 'ramp' | 'escalator'
+
+/**
+ * A cross-floor link joining a node on one floor to a node on another. Because each floor lives
+ * in its own (logically-only aligned) space, the link carries explicit physical facts the router
+ * turns into a traversal cost — see lib/routing.ts and apps/FORMAT.md.
+ */
+export interface FloorConnection {
+  id: string
+  kind: ConnectionKind
+  /** elevator/ramp default true, stairs/escalator default false; overridable. */
+  accessible: boolean
+  from: string // node id on floorFrom
+  to: string // node id on floorTo
+  floorFrom: number // Floor.level
+  floorTo: number
+  rise_m: number // vertical climb (meters)
+  steps?: number
+  length_m?: number // optional horizontal travel along the link
+}
+
+/**
+ * One floor of a building: its own point cloud (kept in a runtime map, not here), transform,
+ * calibration, mirror flags and annotations. `level` is the canonical floor number nodes refer to.
+ */
+export interface Floor {
+  id: string
+  level: number
+  name: string
+  elevation_m: number
+  transform: Transform
+  floorHeightViewer: number
+  metersPerViewerUnit: number | null
+  calibrationSamples: CalibrationSample[]
+  mirrorX: boolean
+  mirrorY: boolean
+  mirrorZ: boolean
+  pois: POI[]
+  waypoints: Waypoint[]
+  edges: Edge[]
+  anchors: AnchorPoint[]
+}
+
+/** Runtime-only point-cloud data for a floor (geometry is never serialized to JSON). */
+export interface FloorCloud {
+  geometry: THREE.BufferGeometry
+  hasColor: boolean
+  pointSize: number
+  modelRadius: number
+}
+
+/** Per-profile penalties (meters-equivalent) applied to floor changes. `'excluded'` = forbidden. */
+export interface RoutingProfile {
+  floor_change_penalty_m: number
+  stairs_penalty_m: number | 'excluded'
+  elevator_penalty_m: number | 'excluded'
+  ramp_penalty_m: number | 'excluded'
+  escalator_penalty_m: number | 'excluded'
+}
+
+export interface RoutingProfiles {
+  default: RoutingProfile
+  accessible: RoutingProfile
+}
+
+/** A pending cross-floor link: first endpoint chosen, waiting for the second on another floor. */
+export interface ConnectStart {
+  id: string
+  nodeType: NodeType
+  floorId: string
+  level: number
 }
 

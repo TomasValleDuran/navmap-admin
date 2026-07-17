@@ -152,15 +152,10 @@ export function EditNodeModal() {
         </label>
       )}
       <label className="block">
-        <span className="mb-1 block text-xs uppercase tracking-wider text-muted">Piso</span>
-        <input
-          type="number"
-          min={-5}
-          max={50}
-          value={floor}
-          onChange={(e) => setFloor(parseInt(e.target.value || '0', 10))}
-          className="w-24 rounded-md border border-border bg-panel-2 px-3 py-1.5 text-sm focus:border-accent-blue focus:outline-none"
-        />
+        <span className="mb-1 block text-xs uppercase tracking-wider text-muted">Piso (nivel)</span>
+        <div className="rounded-md border border-border bg-panel-2 px-3 py-1.5 text-sm text-muted">
+          {floor}
+        </div>
       </label>
       <label className="block">
         <span className="mb-1 block text-xs uppercase tracking-wider text-muted">Código QR (opcional)</span>
