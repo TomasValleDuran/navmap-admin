@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react'
-import { Download, QrCode, Upload, Upload as FileUp } from 'lucide-react'
+import { Download, QrCode, Trash2, Upload, Upload as FileUp } from 'lucide-react'
 import { usePLYLoader } from '../hooks/usePLYLoader'
 import { useNavmapStore } from '../store/useNavmapStore'
 import { downloadJSON, parseImportJSON } from '../lib/jsonIO'
+import { clearPersisted } from '../lib/persist'
 import { ModalShell } from './modals/ModalShell'
+import { ConfirmModal } from './modals/ConfirmModal'
 
 interface Notice {
   title: string
@@ -17,10 +19,22 @@ export function Header() {
   const setStatus = useNavmapStore((s) => s.setStatus)
   const importState = useNavmapStore((s) => s.importState)
   const setQrSheetOpen = useNavmapStore((s) => s.setQrSheetOpen)
+  const resetAll = useNavmapStore((s) => s.resetAll)
 
   // In-app modal state (replaces native confirm()/alert()).
   const [exportWarnings, setExportWarnings] = useState<string[] | null>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
+  const [confirmClear, setConfirmClear] = useState(false)
+
+  const onClearEverything = async () => {
+    resetAll()
+    try {
+      await clearPersisted()
+    } catch (err) {
+      console.warn('No se pudo borrar el almacenamiento local:', err)
+    }
+    setConfirmClear(false)
+  }
 
   const performExport = () => {
     const s = useNavmapStore.getState()
@@ -96,6 +110,7 @@ export function Header() {
         <HeaderButton onClick={() => jsonInputRef.current?.click()} Icon={Upload} label="Importar JSON" />
         <HeaderButton onClick={() => setQrSheetOpen(true)} Icon={QrCode} label="Códigos QR" />
         <HeaderButton onClick={onExport} Icon={Download} label="Exportar JSON" />
+        <HeaderButton onClick={() => setConfirmClear(true)} Icon={Trash2} label="Borrar todo" danger />
       </div>
       <input
         ref={plyInputRef}
@@ -187,6 +202,17 @@ export function Header() {
     >
       <p className="text-sm text-muted">{notice?.message}</p>
     </ModalShell>
+
+    {/* Clear the whole session + local storage */}
+    <ConfirmModal
+      open={confirmClear}
+      title="¿Borrar todo?"
+      message="Se eliminarán todos los pisos, nodos, conexiones y nubes de puntos, incluida la sesión guardada localmente. Esta acción no se puede deshacer."
+      onCancel={() => setConfirmClear(false)}
+      onConfirm={onClearEverything}
+      confirmLabel="Borrar todo"
+      danger
+    />
     </>
   )
 }
@@ -195,16 +221,22 @@ function HeaderButton({
   Icon,
   label,
   onClick,
+  danger = false,
 }: {
   Icon: typeof Download
   label: string
   onClick: () => void
+  danger?: boolean
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-1.5 rounded-md border border-border bg-panel-2 px-3 py-1.5 text-sm text-text hover:border-accent-blue/60"
+      className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm ${
+        danger
+          ? 'border-accent-red/30 bg-accent-red/10 text-accent-red hover:bg-accent-red/20'
+          : 'border-border bg-panel-2 text-text hover:border-accent-blue/60'
+      }`}
     >
       <Icon size={14} />
       {label}

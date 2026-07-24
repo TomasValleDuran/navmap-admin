@@ -11,6 +11,7 @@ import { EditNodeModal } from './ui/modals/EditNodeModal'
 import { ConnectionModal } from './ui/modals/ConnectionModal'
 import { QRSheet } from './ui/QRSheet'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
+import { usePersistence } from './hooks/usePersistence'
 
 const MIN_PANEL_WIDTH = 200
 const MAX_PANEL_WIDTH = 480
@@ -51,6 +52,7 @@ function loadLayout(): PanelLayout {
 
 export default function App() {
   useKeyboardShortcuts()
+  usePersistence()
   const [layout, setLayout] = useState<PanelLayout>(loadLayout)
 
   useEffect(() => {

@@ -17,6 +17,7 @@ import type {
   Floor,
   FloorCloud,
   FloorConnection,
+  GizmoMode,
   MeasurePoint,
   Mode,
   NodeType,
@@ -24,6 +25,8 @@ import type {
   POI,
   POIType,
   RoutingProfiles,
+  SecondaryCloud,
+  SecondaryCloudTransform,
   SelectedNode,
   Transform,
   Waypoint,
@@ -37,6 +40,8 @@ interface NavmapState {
   routingProfiles: RoutingProfiles
   /** Runtime-only point clouds, keyed by floor id. Never serialized. */
   floorClouds: Record<string, FloorCloud>
+  /** Runtime-only secondary clouds (alignment scaffolding), keyed by floor id. Never serialized. */
+  floorSecondaryClouds: Record<string, SecondaryCloud[]>
 
   // ---- live mirror of the active floor (kept in sync; readers use these) ----
   pois: POI[]
@@ -55,6 +60,11 @@ interface NavmapState {
   pointCloudPointSize: number
   modelRadius: number
   modelLoaded: boolean
+  /** Live mirror of the active floor's secondary clouds. */
+  secondaryClouds: SecondaryCloud[]
+  /** Which secondary cloud the alignment gizmo is attached to (null → gizmo hidden). */
+  selectedCloudId: string | null
+  gizmoMode: GizmoMode
 
   // ---- global UI / interaction state ----
   mode: Mode
@@ -117,6 +127,20 @@ interface NavmapState {
   setModelLoaded: (v: boolean) => void
   setStatus: (text: string) => void
   setPointCloud: (data: FloorCloud) => void
+
+  // ---- secondary clouds (alignment scaffolding) ----
+  addSecondaryCloud: (data: {
+    name: string
+    geometry: THREE.BufferGeometry
+    hasColor: boolean
+    pointSize: number
+    modelRadius: number
+  }) => SecondaryCloud
+  updateSecondaryCloudTransform: (id: string, patch: Partial<SecondaryCloudTransform>) => void
+  removeSecondaryCloud: (id: string) => void
+  toggleSecondaryVisible: (id: string) => void
+  selectSecondaryCloud: (id: string | null) => void
+  setGizmoMode: (mode: GizmoMode) => void
   setLoading: (v: boolean) => void
   setCoordHover: (c: ColmapPos | null) => void
   startEdit: (n: SelectedNode) => void
@@ -130,6 +154,18 @@ interface NavmapState {
     connections?: FloorConnection[]
     routingProfiles?: RoutingProfiles
   }) => void
+
+  /** Restore a full persisted session (annotations + clouds + secondary clouds). */
+  hydrateState: (s: {
+    floors: Floor[]
+    activeFloorId: string
+    connections: FloorConnection[]
+    routingProfiles: RoutingProfiles
+    floorClouds: Record<string, FloorCloud>
+    floorSecondaryClouds: Record<string, SecondaryCloud[]>
+  }) => void
+  /** Wipe everything back to a single empty floor. */
+  resetAll: () => void
 
   // ---- calibration / measure ----
   addMeasurePoint: (p: MeasurePoint) => void
@@ -226,6 +262,22 @@ function cloudMirror(cloud: FloorCloud | undefined) {
   }
 }
 
+/** Distinct tints so each secondary cloud reads apart from the primary during alignment. */
+const SECONDARY_TINTS = ['#ff8c42', '#42a5ff', '#66bb6a', '#ab47bc', '#ffca28', '#ec407a']
+
+/** Mirrors the given floor's secondary clouds to the live top-level field. */
+function secondaryMirror(clouds: SecondaryCloud[] | undefined) {
+  return { secondaryClouds: clouds ?? [] }
+}
+
+/** Writes `clouds` into the active floor's secondary-cloud list and re-mirrors it. */
+function withActiveSecondaryClouds(s: NavmapState, clouds: SecondaryCloud[]): Partial<NavmapState> {
+  return {
+    floorSecondaryClouds: { ...s.floorSecondaryClouds, [s.activeFloorId]: clouds },
+    ...secondaryMirror(clouds),
+  }
+}
+
 const initialFloor = makeFloor(0, 'Planta baja', new Set())
 
 /** Returns a state patch that writes `patch` into the active floor and re-mirrors its fields. */
@@ -266,6 +318,7 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
   connections: [],
   routingProfiles: defaultRoutingProfiles,
   floorClouds: {},
+  floorSecondaryClouds: {},
 
   // mirror of initialFloor (empty)
   pois: [],
@@ -284,6 +337,9 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
   pointCloudPointSize: 0.0012,
   modelRadius: 4,
   modelLoaded: false,
+  secondaryClouds: [],
+  selectedCloudId: null,
+  gizmoMode: 'translate',
 
   mode: 'view',
   pendingPoint: null,
@@ -313,6 +369,8 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
       activeFloorId: floor.id,
       ...mirrorOf(floor),
       ...cloudMirror(undefined),
+      ...secondaryMirror(undefined),
+      selectedCloudId: null,
       selectedNode: null,
       edgeStart: null,
       pendingPoint: null,
@@ -332,15 +390,20 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
         : s.connections
       const floorClouds = { ...s.floorClouds }
       delete floorClouds[id]
+      const floorSecondaryClouds = { ...s.floorSecondaryClouds }
+      delete floorSecondaryClouds[id]
       const nextActiveId = s.activeFloorId === id ? floors[0].id : s.activeFloorId
       const active = floors.find((f) => f.id === nextActiveId) ?? floors[0]
       return {
         floors,
         connections,
         floorClouds,
+        floorSecondaryClouds,
         activeFloorId: nextActiveId,
         ...mirrorOf(active),
         ...cloudMirror(floorClouds[nextActiveId]),
+        ...secondaryMirror(floorSecondaryClouds[nextActiveId]),
+        selectedCloudId: null,
         selectedNode: null,
         edgeStart: null,
         connectStart: null,
@@ -358,7 +421,9 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
         activeFloorId: id,
         ...mirrorOf(active),
         ...cloudMirror(s.floorClouds[id]),
+        ...secondaryMirror(s.floorSecondaryClouds[id]),
         // reset per-floor transient state, but keep connectStart so cross-floor links survive a switch
+        selectedCloudId: null,
         selectedNode: null,
         edgeStart: null,
         pendingPoint: null,
@@ -557,6 +622,69 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
       ...cloudMirror(cloud),
     })),
 
+  // ---- secondary clouds (alignment scaffolding) ----
+  addSecondaryCloud: (data) => {
+    const s = get()
+    const list = s.secondaryClouds
+    // Spawn offset along X (by roughly the primary's radius) so it doesn't land on top of it.
+    const offset = Math.max(s.modelRadius, 2) * 1.2
+    const cloud: SecondaryCloud = {
+      id: uniqueId('cloud', new Set(list.map((c) => c.id))),
+      name: data.name,
+      geometry: data.geometry,
+      hasColor: data.hasColor,
+      pointSize: data.pointSize,
+      modelRadius: data.modelRadius,
+      transform: { position: [offset, 0, 0], quaternion: [0, 0, 0, 1], scale: 1 },
+      visible: true,
+      tint: SECONDARY_TINTS[list.length % SECONDARY_TINTS.length],
+    }
+    set({
+      ...withActiveSecondaryClouds(s, [...list, cloud]),
+      selectedCloudId: cloud.id,
+      gizmoMode: 'translate',
+    })
+    return cloud
+  },
+
+  updateSecondaryCloudTransform: (id, patch) =>
+    set((s) => {
+      const clouds = s.secondaryClouds.map((c) =>
+        c.id === id
+          ? {
+              ...c,
+              transform: {
+                ...c.transform,
+                ...patch,
+                // uniform scale is invariant — a scalar can never encode a non-uniform value
+                scale: patch.scale !== undefined ? patch.scale : c.transform.scale,
+              },
+            }
+          : c,
+      )
+      return withActiveSecondaryClouds(s, clouds)
+    }),
+
+  removeSecondaryCloud: (id) =>
+    set((s) => ({
+      ...withActiveSecondaryClouds(
+        s,
+        s.secondaryClouds.filter((c) => c.id !== id),
+      ),
+      selectedCloudId: s.selectedCloudId === id ? null : s.selectedCloudId,
+    })),
+
+  toggleSecondaryVisible: (id) =>
+    set((s) =>
+      withActiveSecondaryClouds(
+        s,
+        s.secondaryClouds.map((c) => (c.id === id ? { ...c, visible: !c.visible } : c)),
+      ),
+    ),
+
+  selectSecondaryCloud: (selectedCloudId) => set({ selectedCloudId }),
+  setGizmoMode: (gizmoMode) => set({ gizmoMode }),
+
   setLoading: (isLoading) => set({ isLoading }),
   setCoordHover: (coordHover) => set({ coordHover }),
   startEdit: (editingNode) => set({ editingNode }),
@@ -577,8 +705,11 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
         connections: connections ?? [],
         routingProfiles: routingProfiles ?? s.routingProfiles,
         floorClouds: {}, // clouds are re-loaded per floor after import
+        floorSecondaryClouds: {}, // secondary clouds are a live authoring aid, re-dropped after import
         ...mirrorOf(active),
         ...cloudMirror(undefined),
+        ...secondaryMirror(undefined),
+        selectedCloudId: null,
         selectedNode: null,
         edgeStart: null,
         connectStart: null,
@@ -588,6 +719,57 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
         validationIssues: null,
       }
     }),
+
+  hydrateState: ({ floors, activeFloorId, connections, routingProfiles, floorClouds, floorSecondaryClouds }) =>
+    set((s) => {
+      const safeFloors = floors.length ? floors : [makeFloor(0, 'Planta baja', new Set())]
+      const activeId = safeFloors.some((f) => f.id === activeFloorId) ? activeFloorId : safeFloors[0].id
+      const active = safeFloors.find((f) => f.id === activeId) ?? safeFloors[0]
+      return {
+        floors: safeFloors,
+        activeFloorId: activeId,
+        connections,
+        routingProfiles: routingProfiles ?? s.routingProfiles,
+        floorClouds,
+        floorSecondaryClouds,
+        ...mirrorOf(active),
+        ...cloudMirror(floorClouds[activeId]),
+        ...secondaryMirror(floorSecondaryClouds[activeId]),
+        selectedCloudId: null,
+        selectedNode: null,
+        edgeStart: null,
+        connectStart: null,
+        pendingPoint: null,
+        measurePoints: [],
+        measureHover: null,
+        validationIssues: null,
+      }
+    }),
+
+  resetAll: () => {
+    const floor = makeFloor(0, 'Planta baja', new Set())
+    set({
+      floors: [floor],
+      activeFloorId: floor.id,
+      connections: [],
+      routingProfiles: defaultRoutingProfiles,
+      floorClouds: {},
+      floorSecondaryClouds: {},
+      ...mirrorOf(floor),
+      ...cloudMirror(undefined),
+      ...secondaryMirror(undefined),
+      selectedCloudId: null,
+      selectedNode: null,
+      editingNode: null,
+      edgeStart: null,
+      connectStart: null,
+      pendingPoint: null,
+      measurePoints: [],
+      measureHover: null,
+      validationIssues: null,
+      statusText: 'Todo borrado. Cargá un archivo .ply para comenzar.',
+    })
+  },
 
   // ---- calibration / measure ----
   addMeasurePoint: (p) =>

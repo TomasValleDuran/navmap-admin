@@ -160,6 +160,35 @@ export interface FloorCloud {
   modelRadius: number
 }
 
+/** Similarity transform of a secondary cloud within the floor's viewer frame. Scale is uniform. */
+export interface SecondaryCloudTransform {
+  position: [number, number, number]
+  quaternion: [number, number, number, number]
+  scale: number
+}
+
+/**
+ * An extra point cloud manually placed onto a floor as visual scaffolding (e.g. a COLMAP
+ * partition re-assembled next to the primary). Runtime-only: geometry is never serialized, and
+ * the calibration/transform of the floor stays owned by the primary cloud. See TASK2_PLAN.md.
+ */
+export interface SecondaryCloud {
+  id: string
+  /** Source filename, shown in the cloud list. */
+  name: string
+  geometry: THREE.BufferGeometry
+  hasColor: boolean
+  pointSize: number
+  modelRadius: number
+  transform: SecondaryCloudTransform
+  visible: boolean
+  /** Hex color used to tint the cloud so it reads distinctly from the primary. */
+  tint: string
+}
+
+/** Which handle set the alignment gizmo shows for the selected secondary cloud. */
+export type GizmoMode = 'translate' | 'rotate' | 'scale'
+
 /** Per-profile penalties (meters-equivalent) applied to floor changes. `'excluded'` = forbidden. */
 export interface RoutingProfile {
   floor_change_penalty_m: number

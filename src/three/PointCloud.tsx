@@ -1,4 +1,5 @@
 import { useNavmapStore } from '../store/useNavmapStore'
+import { SecondaryClouds } from './SecondaryClouds'
 
 export function PointCloud() {
   const geometry = useNavmapStore((s) => s.pointCloudGeometry)
@@ -16,6 +17,8 @@ export function PointCloud() {
           color={hasColor ? 0xffffff : 0xaabbcc}
         />
       </points>
+      {/* Secondary alignment clouds live inside model-group so picking treats them as one cloud. */}
+      <SecondaryClouds />
     </group>
   )
 }

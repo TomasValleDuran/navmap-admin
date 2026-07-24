@@ -4,6 +4,7 @@ import { FloorPlane } from './FloorPlane'
 import { MarkersLayer } from './MarkersLayer'
 import { PlacementController } from './PlacementController'
 import { HoverTracker } from './HoverTracker'
+import { CloudGizmo } from './CloudGizmo'
 import { CameraRig } from './CameraRig'
 import { MeasureLayer } from './MeasureLayer'
 import { useNavmapStore } from '../store/useNavmapStore'
@@ -36,6 +37,7 @@ export function Scene() {
       </group>
       <PlacementController />
       <HoverTracker />
+      <CloudGizmo />
       <CameraRig />
     </Canvas>
   )
