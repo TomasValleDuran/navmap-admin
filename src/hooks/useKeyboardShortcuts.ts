@@ -12,6 +12,7 @@ const MODE_KEYS: Record<string, Mode> = {
   '6': 'measure',
   '7': 'anchor',
   '8': 'connect-floors',
+  '9': 'person',
 }
 
 function isTypingTarget(el: EventTarget | null): boolean {

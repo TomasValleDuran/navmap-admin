@@ -22,6 +22,7 @@ import type {
   Mode,
   NodeType,
   PendingPoint,
+  PersonMarker,
   POI,
   POIType,
   RoutingProfiles,
@@ -42,6 +43,8 @@ interface NavmapState {
   floorClouds: Record<string, FloorCloud>
   /** Runtime-only secondary clouds (alignment scaffolding), keyed by floor id. Never serialized. */
   floorSecondaryClouds: Record<string, SecondaryCloud[]>
+  /** Runtime-only reference figures, keyed by floor id. Never serialized ni exportadas. */
+  people: Record<string, PersonMarker[]>
 
   // ---- live mirror of the active floor (kept in sync; readers use these) ----
   pois: POI[]
@@ -143,6 +146,9 @@ interface NavmapState {
   setGizmoMode: (mode: GizmoMode) => void
   setLoading: (v: boolean) => void
   setCoordHover: (c: ColmapPos | null) => void
+  addPerson: (p: { x: number; y: number; z: number; label?: string }) => void
+  removePerson: (id: string) => void
+  clearPeople: () => void
   startEdit: (n: SelectedNode) => void
   cancelEdit: () => void
   setCameraMode: (m: 'orbit' | 'walk' | 'plan') => void
@@ -319,6 +325,7 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
   routingProfiles: defaultRoutingProfiles,
   floorClouds: {},
   floorSecondaryClouds: {},
+  people: {},
 
   // mirror of initialFloor (empty)
   pois: [],
@@ -687,6 +694,27 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
 
   setLoading: (isLoading) => set({ isLoading }),
   setCoordHover: (coordHover) => set({ coordHover }),
+
+  addPerson: ({ x, y, z, label }) =>
+    set((s) => {
+      const list = s.people[s.activeFloorId] ?? []
+      const person: PersonMarker = {
+        id: uniqueId(slugify(label || `persona-${list.length + 1}`), new Set(list.map((p) => p.id))),
+        label: label?.trim() || `Persona ${list.length + 1}`,
+        x,
+        y,
+        z,
+      }
+      return { people: { ...s.people, [s.activeFloorId]: [...list, person] } }
+    }),
+  removePerson: (id) =>
+    set((s) => ({
+      people: {
+        ...s.people,
+        [s.activeFloorId]: (s.people[s.activeFloorId] ?? []).filter((p) => p.id !== id),
+      },
+    })),
+  clearPeople: () => set((s) => ({ people: { ...s.people, [s.activeFloorId]: [] } })),
   startEdit: (editingNode) => set({ editingNode }),
   cancelEdit: () => set({ editingNode: null }),
   setCameraMode: (cameraMode) => set({ cameraMode }),

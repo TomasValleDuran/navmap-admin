@@ -1,4 +1,4 @@
-import { Anchor, ArrowUpDown, Crosshair, Eye, GitBranch, MapPin, Navigation, Ruler } from 'lucide-react'
+import { Anchor, ArrowUpDown, Crosshair, Eye, GitBranch, MapPin, Navigation, PersonStanding, Ruler } from 'lucide-react'
 import { useNavmapStore } from '../store/useNavmapStore'
 import type { Mode } from '../types/navmap'
 import type { LucideIcon } from 'lucide-react'
@@ -11,6 +11,7 @@ const MODES: { key: Mode; label: string; hint: string; Icon: LucideIcon; shortcu
   { key: 'select', label: 'Seleccionar', hint: 'Click en un nodo para inspeccionarlo.', Icon: Crosshair, shortcut: '5' },
   { key: 'measure', label: 'Medir', hint: 'Click en dos puntos del modelo para medir.', Icon: Ruler, shortcut: '6' },
   { key: 'anchor', label: 'Ancla AR', hint: 'Click en un punto físico identificable para crear un ancla de alineación AR.', Icon: Anchor, shortcut: '7' },
+  { key: 'person', label: 'Persona', hint: 'Escribí una coordenada COLMAP y plantá una figura de 1.8 m para comparar escala y posición.', Icon: PersonStanding, shortcut: '9' },
   { key: 'connect-floors', label: 'Conectar pisos', hint: 'Click en un nodo, cambiá de piso y click en otro nodo para conectarlos (escaleras/ascensor).', Icon: ArrowUpDown, shortcut: '8' },
 ]
 

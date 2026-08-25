@@ -9,6 +9,7 @@ export type Mode =
   | 'measure'
   | 'anchor'
   | 'connect-floors'
+  | 'person'
 
 export interface MeasurePoint {
   vx: number
@@ -58,6 +59,22 @@ export interface AnchorPoint {
   label: string
   desc: string
   floor: number
+  x: number
+  y: number
+  z: number
+}
+
+/**
+ * Figura humana de referencia, plantada en una coordenada COLMAP escrita a mano.
+ *
+ * Es una ayuda de diagnostico, no dato del edificio: sirve para chequear a ojo que una
+ * pose que devolvio el servidor cae donde uno cree. Por eso vive fuera de `Floor` — no se
+ * exporta al JSON ni se persiste, se pierde al recargar y esta bien que asi sea.
+ */
+export interface PersonMarker {
+  id: string
+  label: string
+  /** Coordenadas COLMAP, las mismas que muestra el readout del cursor. */
   x: number
   y: number
   z: number

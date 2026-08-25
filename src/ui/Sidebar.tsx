@@ -7,6 +7,7 @@ import { EdgeList } from './EdgeList'
 import { FloorBar } from './FloorBar'
 import { MeasurePanel } from './MeasurePanel'
 import { ModePicker } from './ModePicker'
+import { PersonPanel } from './PersonPanel'
 import { POIList } from './POIList'
 import { ValidationPanel } from './ValidationPanel'
 import { WaypointList } from './WaypointList'
@@ -50,6 +51,7 @@ export function Sidebar({ width, collapsed, onToggle }: Props) {
       <FloorBar />
       <ModePicker />
       <MeasurePanel />
+      <PersonPanel />
       <AxesPanel />
       <POIList />
       <WaypointList />
