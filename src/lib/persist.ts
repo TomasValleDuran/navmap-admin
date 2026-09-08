@@ -122,6 +122,9 @@ function deserializeFloor(sf: StoredFloor): Floor {
   const alignQ = sf.transform.alignQ ? new THREE.Quaternion().fromArray(sf.transform.alignQ) : null
   return {
     ...sf,
+    // Una sesión guardada antes de que existieran las paredes no trae el campo, y el tipo dice
+    // que sí: sin este default el piso restaurado revienta al primer `walls.length`.
+    walls: sf.walls ?? [],
     transform: {
       cx: sf.transform.cx,
       cy: sf.transform.cy,

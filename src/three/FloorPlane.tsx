@@ -10,7 +10,7 @@ export function FloorPlane() {
   const floorLock = useNavmapStore((s) => s.floorLock)
 
   const sz = useMemo(() => Math.max(modelRadius * 2.2, 6), [modelRadius])
-  const marking = floorLock || mode === 'poi' || mode === 'waypoint'
+  const marking = floorLock || mode === 'poi' || mode === 'waypoint' || mode === 'wall' || mode === 'sight'
   const color = marking ? 0x1f4d38 : 0x152a22
   const opacity = marking ? 0.58 : 0.42
 

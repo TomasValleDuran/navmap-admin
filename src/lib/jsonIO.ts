@@ -12,6 +12,8 @@ import type {
   POIType,
   RoutingProfiles,
   Transform,
+  WallKind,
+  WallSegment,
   Waypoint,
 } from '../types/navmap'
 
@@ -128,6 +130,19 @@ function floorToJSON(floor: Floor) {
       length_3d_m: toMetersScalar(e.weight),
       length_2d_m: toMetersScalar(e.weight2d),
     })),
+    // Paredes marcadas a mano, en COLMAP como todo lo demás: son el único dato de dónde hay
+    // muros. Lista vacía = no se marcó ninguna, y el consumidor no oculta nada.
+    walls: floor.walls.map((w) => ({
+      id: w.id,
+      kind: w.kind,
+      a: { x: w.ax, y: w.ay, z: w.az },
+      b: { x: w.bx, y: w.by, z: w.bz },
+      a_m: toMetersPos(w.ax, w.ay, w.az),
+      b_m: toMetersPos(w.bx, w.by, w.bz),
+      length_m: calibrated
+        ? Math.hypot(w.bx - w.ax, w.by - w.ay, w.bz - w.az) * scaleM
+        : null,
+    })),
   }
 }
 
@@ -196,6 +211,13 @@ interface RawTransformInfo {
   calibration_samples?: V2CalibrationSample[]
 }
 
+interface RawWall {
+  id?: string
+  kind?: WallKind
+  a: { x: number; y: number; z: number }
+  b: { x: number; y: number; z: number }
+}
+
 interface V2Node {
   id: string
   node_type: NodeType
@@ -254,6 +276,7 @@ interface RawFloor {
   nodes?: V2Node[]
   edges?: V2Edge[]
   anchors?: V2Anchor[]
+  walls?: RawWall[]
 }
 
 interface RawConnection {
@@ -271,6 +294,7 @@ interface RawConnection {
 
 interface RawData {
   version?: string
+  walls?: RawWall[]
   // v3.0
   floors?: RawFloor[]
   connections?: RawConnection[]
@@ -353,6 +377,15 @@ function nodesToFloorParts(rawNodes: V2Node[], rawEdges: V2Edge[]) {
   return { pois, waypoints, edges }
 }
 
+function wallsFromRaw(rawWalls: RawWall[] | undefined): WallSegment[] {
+  return (rawWalls ?? []).map((w, i) => ({
+    id: w.id ?? `wall-${i + 1}`,
+    kind: w.kind === 'railing' ? 'railing' : 'wall',
+    ax: w.a.x, ay: w.a.y, az: w.a.z,
+    bx: w.b.x, by: w.b.y, bz: w.b.z,
+  }))
+}
+
 function anchorsFromRaw(rawAnchors: V2Anchor[], level: number): AnchorPoint[] {
   return rawAnchors.map((a, i) => ({
     id: a.id,
@@ -393,6 +426,7 @@ export function parseImportJSON(text: string): ImportResult {
         waypoints,
         edges,
         anchors: anchorsFromRaw(rf.anchors ?? [], level),
+        walls: wallsFromRaw(rf.walls),
       }
     })
     const connections: FloorConnection[] = (data.connections ?? []).map((c, i) => ({
@@ -429,6 +463,7 @@ export function parseImportJSON(text: string): ImportResult {
       waypoints,
       edges,
       anchors: anchorsFromRaw(data.anchors ?? [], 0),
+      walls: wallsFromRaw(data.walls),
     }
     return { floors: [floor], connections: [], version: '2.0' }
   }
@@ -465,6 +500,7 @@ export function parseImportJSON(text: string): ImportResult {
       waypoints,
       edges: [],
       anchors: [],
+      walls: [],
     }
     return { floors: [floor], connections: [], version: '1' }
   }

@@ -2,16 +2,11 @@ import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useNavmapStore } from '../store/useNavmapStore'
+import { keyGoesToField } from '../lib/keyboard'
 
 const UP = new THREE.Vector3(0, 1, 0)
 const FWD = new THREE.Vector3()
 const RIGHT = new THREE.Vector3()
-
-function isTyping(el: EventTarget | null): boolean {
-  if (!(el instanceof HTMLElement)) return false
-  const t = el.tagName
-  return t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || el.isContentEditable
-}
 
 const MOVE_KEYS = new Set(['w', 'a', 's', 'd', 'q', 'e'])
 const LOOK_KEYS = new Set(['arrowup', 'arrowdown', 'arrowleft', 'arrowright'])
@@ -31,7 +26,7 @@ export function WalkControls() {
     pitch.current = Math.asin(Math.max(-1, Math.min(1, dir.y)))
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (isTyping(e.target)) return
+      if (keyGoesToField(e.target, e.key)) return
       const k = e.key.toLowerCase()
       if (HELD_KEYS.has(k)) {
         keys.current.add(k)

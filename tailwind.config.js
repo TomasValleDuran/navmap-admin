@@ -16,6 +16,8 @@ export default {
           orange: '#f0a030',
           red: '#ef4d4d',
           pink: '#f472b6',
+          // Resaltado: la pared elegida en la lista y los puntos a medio marcar en el visor.
+          yellow: '#facc15',
         },
       },
       fontFamily: {

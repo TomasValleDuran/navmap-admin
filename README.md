@@ -31,11 +31,15 @@ npm run lint     # eslint
 8. **Connect floors** — *Conectar pisos* mode (`8`): click a stair/elevator node on one floor, switch to another floor in the *Pisos* panel, click the matching node, then set the connection's `kind` (stairs/elevator/ramp/escalator), whether it's `accessible`, the `rise_m`, and optional `steps`/`length_m`. Up/down cones mark connection endpoints on the active floor (green = accessible, orange = stairs).
 9. **Preview routes** — in the right *Vista previa de ruta* panel pick a start and end node and a profile (*Normal* / *Accesible*) to sanity-check what the router will do: the *Accesible* profile excludes stairs, so it should switch to the elevator.
 10. **Inspect / edit** — *Seleccionar* mode (`5`) to click a node and see its info; double-click in the list to edit.
-11. **Validate** — hit *Validar* in the left sidebar: it flags orphan nodes, disconnected components, missing calibration/anchors, edges that cross walls, floors with no connection, and floors that aren't reachable step-free under the accessible profile. Export also runs this check.
-12. **Export** — *Exportar JSON* in the header writes `navmap_building.json` (v3.0): every floor with its own transform/anchors/nodes/edges and metric/AR coordinates, plus the cross-floor `connections` and the `routing_profiles`.
-13. **Re-import** — *Importar JSON* restores all floors, connections and routing profiles. Old single-floor v1/v2.0 files are migrated to one floor 0. Point clouds aren't stored in JSON — reload each floor's `.PLY` after importing.
+11. **Marcar las paredes** — *Pared* (`0`): click en los dos extremos de cada pared, sobre el piso. Elegí antes si es **pared** (muro opaco: corta el paso y la vista) o **baranda** (baranda, vidrio o media pared: corta el paso, pero se ve a través — la app sigue mostrando lo que hay del otro lado). Se marcan a mano porque la nube COLMAP es *sparse*: una pared lisa no tiene textura, no genera puntos y directamente no está en la nube, mientras que un cartel sí genera un bloque denso en medio del pasillo. Si no marcás ninguna, el mapa sale sin paredes y la app dibuja todo como siempre — la funcionalidad es opcional de punta a punta. Las paredes marcadas son las que usa la validación para avisar "esta arista atraviesa una pared" y las que consume la app AR. No tienen nombre, así que la lista las numera y tocar una fila (o pasarle el mouse) la prende en amarillo en el visor.
+12. **Validate** — hit *Validar* in the left sidebar: it flags orphan nodes, disconnected components, missing calibration/anchors, edges that cross walls, floors with no connection, and floors that aren't reachable step-free under the accessible profile. Export also runs this check.
+13. **Export** — *Exportar JSON* in the header writes `navmap_building.json` (v3.0): every floor with its own transform/anchors/nodes/edges and metric/AR coordinates, plus the cross-floor `connections` and the `routing_profiles`.
+14. **Re-import** — *Importar JSON* restores all floors, connections and routing profiles. Old single-floor v1/v2.0 files are migrated to one floor 0. Point clouds aren't stored in JSON — reload each floor's `.PLY` after importing.
 
-## Modes (left sidebar)
+## Modes (icon rail, far left)
+
+The rail is always visible and grouped: view/select, then the drawing modes, then the tools.
+Everything else stays where it was — one scrolling column of panels next to the rail.
 
 | Key | Mode | What a click does |
 | --- | ----------- | ----------------- |
@@ -47,6 +51,9 @@ npm run lint     # eslint
 | `6` | Medir       | Click two points on the model to measure / calibrate |
 | `7` | Ancla AR    | Click a physical feature to add an AR alignment anchor |
 | `8` | Conectar pisos | Click a node, switch floor in the *Pisos* panel, click another node to link them (stairs/elevator) |
+| `9` | Persona     | Plant a 1.8 m reference figure at a typed COLMAP coordinate |
+| `0` | Pared       | Click the two ends of a wall on the floor. Pick *Pared* (opaque) or *Baranda* (see-through) first |
+| `v` | Visión      | Click a spot on the floor to simulate what the app would draw from there: green rays reach, red ones are cut by a wall |
 
 ## Keyboard shortcuts
 

@@ -11,7 +11,10 @@ const tmpHit = new THREE.Vector3()
 
 function shouldPickFloor(): boolean {
   const s = useNavmapStore.getState()
-  return s.floorLock || s.mode === 'poi' || s.mode === 'waypoint'
+  // Las paredes son líneas en planta: siempre sobre el piso, sin importar floorLock. Marcarlas
+  // sobre la nube las dejaría a la altura del punto que pegaste, que para un muro no significa
+  // nada — y encima la nube es justo donde no hay puntos cuando la pared es lisa.
+  return s.floorLock || s.mode === 'poi' || s.mode === 'waypoint' || s.mode === 'wall' || s.mode === 'sight'
 }
 
 export function PlacementController() {
@@ -39,7 +42,9 @@ export function PlacementController() {
         state.mode !== 'poi' &&
         state.mode !== 'waypoint' &&
         state.mode !== 'measure' &&
-        state.mode !== 'anchor'
+        state.mode !== 'anchor' &&
+        state.mode !== 'wall' &&
+        state.mode !== 'sight'
       )
         return
 
@@ -103,6 +108,22 @@ export function PlacementController() {
         return
       }
       unmirror(point)
+      if (state.mode === 'sight') {
+        // El punto de vista es el "parado acá" de la simulación: vive en el piso, como el
+        // usuario, no en la nube. La altura de los ojos la pone la capa que lo dibuja.
+        state.setSightPoint({ vx: point.x, vy: point.y, vz: point.z })
+        state.setStatus('Punto de vista marcado: verde es lo que la app dibujaría, rojo lo que tapa un muro.')
+        return
+      }
+      if (state.mode === 'wall') {
+        const wall = state.addWallPoint({ vx: point.x, vy: point.y, vz: point.z })
+        state.setStatus(
+          wall
+            ? `${wall.kind === 'railing' ? 'Baranda' : 'Pared'} marcada. Click para empezar la siguiente.`
+            : 'Primer extremo fijado. Click en el otro extremo (Esc cancela).',
+        )
+        return
+      }
       const c = viewerToColmap(point.x, point.y, point.z, state.transform)
       state.setPendingPoint({ x: c.x, y: c.y, z: c.z, vx: point.x, vy: point.y, vz: point.z })
     }

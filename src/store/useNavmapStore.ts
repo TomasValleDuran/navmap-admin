@@ -30,6 +30,8 @@ import type {
   SecondaryCloudTransform,
   SelectedNode,
   Transform,
+  WallKind,
+  WallSegment,
   Waypoint,
 } from '../types/navmap'
 
@@ -51,6 +53,7 @@ interface NavmapState {
   waypoints: Waypoint[]
   edges: Edge[]
   anchors: AnchorPoint[]
+  walls: WallSegment[]
   transform: Transform
   floorHeightViewer: number
   metersPerViewerUnit: number | null
@@ -84,6 +87,30 @@ interface NavmapState {
   focusRequestId: number
   measurePoints: MeasurePoint[]
   measureHover: MeasurePoint | null
+  /** Primer extremo de la pared que se está dibujando (coords viewer), o null. */
+  wallStart: MeasurePoint | null
+  /** Qué se dibuja con el próximo par de clicks: muro opaco o baranda. */
+  wallKind: WallKind
+  /** Mostrar las paredes marcadas en el visor. */
+  showWalls: boolean
+  /**
+   * Pared elegida en la lista, resaltada en el visor.
+   *
+   * Las paredes no tienen nombre —son dos puntos y un tipo—, así que la única forma de saber
+   * cuál es cuál en la lista es que se prenda en el 3-D al tocarla.
+   */
+  selectedWallId: string | null
+  /** Pared bajo el cursor en la lista: mismo resaltado, sin tener que clickear. */
+  hoveredWallId: string | null
+  /**
+   * Punto de vista de la simulación de visibilidad (coords viewer), o null.
+   *
+   * Es el "parado acá" del modo Visión: desde ahí se calcula qué nodos y aristas dibujaría la
+   * app y cuáles le tapa un muro. Transitorio como la medición — no se exporta ni se persiste.
+   */
+  sightPoint: MeasurePoint | null
+  /** Dibujar también los rayos que sí llegan; apagado deja sólo lo que queda tapado. */
+  sightShowVisible: boolean
   validationIssues: ValidationIssue[] | null
   qrSheetOpen: boolean
 
@@ -176,6 +203,17 @@ interface NavmapState {
   // ---- calibration / measure ----
   addMeasurePoint: (p: MeasurePoint) => void
   clearMeasure: () => void
+  /** Agrega un extremo de pared; al segundo click crea el segmento y devuelve la pared. */
+  addWallPoint: (p: MeasurePoint) => WallSegment | null
+  cancelWall: () => void
+  deleteWall: (id: string) => void
+  setWallKind: (kind: WallKind) => void
+  toggleShowWalls: () => void
+  /** Alterna la pared resaltada; pasar la que ya estaba elegida la apaga. */
+  selectWall: (id: string | null) => void
+  setHoveredWall: (id: string | null) => void
+  setSightPoint: (p: MeasurePoint | null) => void
+  toggleSightShowVisible: () => void
   setMeasureHover: (p: MeasurePoint | null) => void
   setMetersPerViewerUnit: (v: number | null) => void
   addCalibrationSample: (realMeters: number) => CalibrationSample | null
@@ -188,7 +226,6 @@ interface NavmapState {
 
   // ---- validation / misc ----
   runValidation: () => ValidationIssue[]
-  clearValidation: () => void
   setMirror: (axis: 'x' | 'y' | 'z', v: boolean) => void
   setQrSheetOpen: (v: boolean) => void
 }
@@ -216,6 +253,7 @@ function makeFloor(level: number, name: string, existingFloorIds: Set<string>): 
     waypoints: [],
     edges: [],
     anchors: [],
+    walls: [],
   }
 }
 
@@ -248,6 +286,7 @@ function mirrorOf(f: Floor) {
     waypoints: f.waypoints,
     edges: f.edges,
     anchors: f.anchors,
+    walls: f.walls ?? [],
     transform: f.transform,
     floorHeightViewer: f.floorHeightViewer,
     metersPerViewerUnit: f.metersPerViewerUnit,
@@ -274,6 +313,51 @@ const SECONDARY_TINTS = ['#ff8c42', '#42a5ff', '#66bb6a', '#ab47bc', '#ffca28', 
 /** Mirrors the given floor's secondary clouds to the live top-level field. */
 function secondaryMirror(clouds: SecondaryCloud[] | undefined) {
   return { secondaryClouds: clouds ?? [] }
+}
+
+/**
+ * Reasigna las nubes ya cargadas a los pisos que trae un import.
+ *
+ * Importar solía vaciar `floorClouds`, con lo cual el orden natural —cargar el .PLY y encima
+ * traer sus anotaciones— dejaba el visor en blanco y obligaba a volver a arrastrar el archivo.
+ * Las anotaciones viven en COLMAP y el JSON trae su propio `transform`, así que la nube que ya
+ * está en memoria sigue siendo válida: lo único que hay que resolver es a qué piso va.
+ *
+ * Se busca por id, después por nivel (un re-export puede renombrar el id pero no el nivel), y
+ * si hay una sola nube y un solo piso se asume que son ésos. Un piso importado que no matchea
+ * con nada queda sin nube, como antes.
+ */
+function reattachClouds(s: NavmapState, floors: Floor[]) {
+  const levelOfPrevFloor = new Map(s.floors.map((f) => [f.id, f.level]))
+  const cloudByLevel = new Map<number, FloorCloud>()
+  const secondaryByLevel = new Map<number, SecondaryCloud[]>()
+  for (const [fid, cloud] of Object.entries(s.floorClouds)) {
+    const level = levelOfPrevFloor.get(fid)
+    if (level != null && !cloudByLevel.has(level)) cloudByLevel.set(level, cloud)
+  }
+  for (const [fid, clouds] of Object.entries(s.floorSecondaryClouds)) {
+    const level = levelOfPrevFloor.get(fid)
+    if (level != null && clouds.length > 0 && !secondaryByLevel.has(level)) {
+      secondaryByLevel.set(level, clouds)
+    }
+  }
+
+  const loadedIds = Object.keys(s.floorClouds)
+  const onlyOne = loadedIds.length === 1 && floors.length === 1 ? loadedIds[0] : null
+
+  const floorClouds: Record<string, FloorCloud> = {}
+  const floorSecondaryClouds: Record<string, SecondaryCloud[]> = {}
+  for (const f of floors) {
+    const cloud =
+      s.floorClouds[f.id] ?? cloudByLevel.get(f.level) ?? (onlyOne ? s.floorClouds[onlyOne] : undefined)
+    if (cloud) floorClouds[f.id] = cloud
+    const secondary =
+      s.floorSecondaryClouds[f.id] ??
+      secondaryByLevel.get(f.level) ??
+      (onlyOne ? s.floorSecondaryClouds[onlyOne] : undefined)
+    if (secondary && secondary.length > 0) floorSecondaryClouds[f.id] = secondary
+  }
+  return { floorClouds, floorSecondaryClouds }
 }
 
 /** Writes `clouds` into the active floor's secondary-cloud list and re-mirrors it. */
@@ -362,6 +446,14 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
   focusRequestId: 0,
   measurePoints: [],
   measureHover: null,
+  walls: initialFloor.walls,
+  wallStart: null,
+  wallKind: 'wall',
+  showWalls: true,
+  selectedWallId: null,
+  hoveredWallId: null,
+  sightPoint: null,
+  sightShowVisible: true,
   validationIssues: null,
   qrSheetOpen: false,
 
@@ -436,6 +528,9 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
         pendingPoint: null,
         measurePoints: [],
         measureHover: null,
+        sightPoint: null,
+        selectedWallId: null,
+        hoveredWallId: null,
       }
     }),
 
@@ -456,6 +551,10 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
       connectStart: mode === 'connect-floors' ? s.connectStart : null,
       measurePoints: mode === 'measure' ? s.measurePoints : [],
       measureHover: null,
+      wallStart: mode === 'wall' ? s.wallStart : null,
+      // El punto de vista vive con el modo: salir de Visión apaga la simulación, para no
+      // dejar rayos colgados encima de lo que estés haciendo después.
+      sightPoint: mode === 'sight' ? s.sightPoint : null,
     })),
 
   setPendingPoint: (pendingPoint) => set({ pendingPoint }),
@@ -727,16 +826,17 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
         ? activeFloorId
         : safeFloors[0].id
       const active = safeFloors.find((f) => f.id === activeId) ?? safeFloors[0]
+      const { floorClouds, floorSecondaryClouds } = reattachClouds(s, safeFloors)
       return {
         floors: safeFloors,
         activeFloorId: activeId,
         connections: connections ?? [],
         routingProfiles: routingProfiles ?? s.routingProfiles,
-        floorClouds: {}, // clouds are re-loaded per floor after import
-        floorSecondaryClouds: {}, // secondary clouds are a live authoring aid, re-dropped after import
+        floorClouds,
+        floorSecondaryClouds,
         ...mirrorOf(active),
-        ...cloudMirror(undefined),
-        ...secondaryMirror(undefined),
+        ...cloudMirror(floorClouds[activeId]),
+        ...secondaryMirror(floorSecondaryClouds[activeId]),
         selectedCloudId: null,
         selectedNode: null,
         edgeStart: null,
@@ -806,6 +906,48 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
       return { measurePoints: next }
     }),
   clearMeasure: () => set({ measurePoints: [], measureHover: null }),
+
+  addWallPoint: (p) => {
+    const s = get()
+    const start = s.wallStart
+    if (!start) {
+      set({ wallStart: p })
+      return null
+    }
+    // Las paredes se guardan en coordenadas COLMAP, igual que los nodos, para que el resto de
+    // la cadena (export, Sim3, servidor) las trate exactamente como trata todo lo demás.
+    const a = viewerToColmap(start.vx, start.vy, start.vz, s.transform)
+    const b = viewerToColmap(p.vx, p.vy, p.vz, s.transform)
+    const wall: WallSegment = {
+      id: uniqueId(`${s.wallKind}-1`, new Set(s.walls.map((w) => w.id))),
+      kind: s.wallKind,
+      ax: a.x, ay: a.y, az: a.z,
+      bx: b.x, by: b.y, bz: b.z,
+    }
+    set({ ...withActiveFloor(s, { walls: [...s.walls, wall] }), wallStart: null })
+    return wall
+  },
+
+  cancelWall: () => set({ wallStart: null }),
+
+  deleteWall: (id) =>
+    set((s) => ({
+      ...withActiveFloor(s, { walls: s.walls.filter((w) => w.id !== id) }),
+      selectedWallId: s.selectedWallId === id ? null : s.selectedWallId,
+      hoveredWallId: s.hoveredWallId === id ? null : s.hoveredWallId,
+    })),
+
+  setWallKind: (wallKind) => set({ wallKind }),
+
+  toggleShowWalls: () => set((s) => ({ showWalls: !s.showWalls })),
+
+  selectWall: (id) => set((s) => ({ selectedWallId: s.selectedWallId === id ? null : id })),
+
+  setHoveredWall: (hoveredWallId) => set({ hoveredWallId }),
+
+  setSightPoint: (sightPoint) => set({ sightPoint }),
+
+  toggleSightShowVisible: () => set((s) => ({ sightShowVisible: !s.sightShowVisible })),
   setMeasureHover: (measureHover) => set({ measureHover }),
   setMetersPerViewerUnit: (metersPerViewerUnit) =>
     set((s) => withActiveFloor(s, { metersPerViewerUnit })),
@@ -874,6 +1016,7 @@ export const useNavmapStore = create<NavmapState>((set, get) => ({
       waypoints: s.waypoints,
       edges: s.edges,
       anchors: s.anchors,
+      walls: s.walls,
       transform: s.transform,
       floorHeightViewer: s.floorHeightViewer,
       metersPerViewerUnit: s.metersPerViewerUnit,

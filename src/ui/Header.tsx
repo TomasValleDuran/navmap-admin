@@ -44,8 +44,10 @@ export function Header() {
       routingProfiles: s.routingProfiles,
     })
     const totalNodes = s.floors.reduce((n, f) => n + f.pois.length + f.waypoints.length, 0)
+    const totalWalls = s.floors.reduce((n, f) => n + f.walls.length, 0)
     setStatus(
-      `Exportado: ${s.floors.length} pisos · ${totalNodes} nodos · ${s.connections.length} conexiones.`,
+      `Exportado: ${s.floors.length} pisos · ${totalNodes} nodos · ${s.connections.length} conexiones · ` +
+        `${totalWalls} paredes.`,
     )
   }
 
@@ -75,18 +77,27 @@ export function Header() {
         routingProfiles: r.routingProfiles,
       })
       const totalNodes = r.floors.reduce((n, f) => n + f.pois.length + f.waypoints.length, 0)
+      // Las nubes que ya estaban cargadas se reasignan a los pisos importados; sólo hace falta
+      // pedir un .PLY por los pisos que quedaron sin ninguna.
+      const after = useNavmapStore.getState()
+      const missing = after.floors.filter((f) => !after.floorClouds[f.id])
+      const kept = after.floors.length - missing.length
       setStatus(
-        `Importado (v${r.version}): ${r.floors.length} pisos · ${totalNodes} nodos · ${r.connections.length} conexiones.`,
+        `Importado (v${r.version}): ${r.floors.length} pisos · ${totalNodes} nodos · ${r.connections.length} conexiones` +
+          (kept > 0 ? ` · nube conservada en ${kept} piso(s).` : '.'),
       )
       if (r.version !== '3.0') {
         setNotice({
           title: 'Mapa migrado',
-          message: `Archivo v${r.version} importado como un solo piso. Volvé a cargar el .PLY de cada piso y re-exportá como v3.0.`,
+          message:
+            `Archivo v${r.version} importado como un solo piso. Re-exportá como v3.0` +
+            (missing.length > 0 ? ', y cargá antes el .PLY del piso.' : '.'),
         })
-      } else {
+      } else if (missing.length > 0) {
         setNotice({
-          title: 'Recargá las nubes',
-          message: 'Anotaciones importadas. Cargá el .PLY de cada piso para volver a ver las nubes de puntos.',
+          title: 'Faltan nubes',
+          message:
+            `Anotaciones importadas. Cargá el .PLY de: ${missing.map((f) => f.name).join(', ')}.`,
         })
       }
     } catch (err) {

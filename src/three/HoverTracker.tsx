@@ -28,6 +28,10 @@ export function HoverTracker() {
       const modelGroup = scene.getObjectByName('model-group')
       const floorMesh = scene.getObjectByName('floor-solid')
       const measuring = state.mode === 'measure' || state.mode === 'anchor'
+      // Las paredes se dibujan sobre el plano del piso (son líneas en planta), así que usan el
+      // camino de picking del piso, no el del modelo — pero sí necesitan el punto bajo el
+      // cursor para la goma elástica del segundo extremo.
+      const wallMode = state.mode === 'wall'
 
       let point: THREE.Vector3 | null = null
       if (measuring) {
@@ -62,7 +66,7 @@ export function HoverTracker() {
       if (state.mirrorX) point.x *= -1
       if (state.mirrorY) point.y *= -1
       if (state.mirrorZ) point.z *= -1
-      if (measuring) {
+      if (measuring || wallMode) {
         state.setMeasureHover({ vx: point.x, vy: point.y, vz: point.z })
       } else if (state.measureHover) {
         state.setMeasureHover(null)

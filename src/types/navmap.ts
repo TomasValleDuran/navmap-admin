@@ -10,6 +10,8 @@ export type Mode =
   | 'anchor'
   | 'connect-floors'
   | 'person'
+  | 'wall'
+  | 'sight'
 
 export interface MeasurePoint {
   vx: number
@@ -52,6 +54,39 @@ export interface Waypoint {
   x: number
   y: number
   z: number
+}
+
+/**
+ * Qué hace una pared, que resultó ser dos cosas distintas:
+ *
+ * - `wall` — muro opaco: corta el paso **y** la vista.
+ * - `railing` — baranda, vidrio, media pared: corta el paso pero **se ve a través**. Un nodo del
+ *   otro lado de una baranda se tiene que dibujar; uno detrás de un muro, no.
+ *
+ * Por eso el validador de aristas usa las dos y la app AR sólo las opacas.
+ */
+export type WallKind = 'wall' | 'railing'
+
+/**
+ * Una pared marcada a mano, como un segmento en planta.
+ *
+ * Se marcan a mano porque detectarlas sobre nube COLMAP *sparse* no funciona: una pared lisa
+ * sin textura no genera puntos y directamente no está en la nube, mientras que un cartel con
+ * textura genera un bloque denso en el medio del pasillo. Sin paredes marcadas no se oculta
+ * nada, que es el comportamiento de siempre.
+ *
+ * Coordenadas COLMAP, igual que los nodos. La `y` se guarda por referencia — los tests son 2-D
+ * sobre el plano del piso, porque las paredes son verticales.
+ */
+export interface WallSegment {
+  id: string
+  kind: WallKind
+  ax: number
+  ay: number
+  az: number
+  bx: number
+  by: number
+  bz: number
 }
 
 export interface AnchorPoint {
@@ -167,6 +202,8 @@ export interface Floor {
   waypoints: Waypoint[]
   edges: Edge[]
   anchors: AnchorPoint[]
+  /** Paredes marcadas a mano en planta. Ver [[WallSegment]]. */
+  walls: WallSegment[]
 }
 
 /** Runtime-only point-cloud data for a floor (geometry is never serialized to JSON). */

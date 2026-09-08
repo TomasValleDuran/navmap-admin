@@ -1,31 +1,13 @@
 import { useEffect } from 'react'
 import { useNavmapStore } from '../store/useNavmapStore'
-import { MODE_LABELS } from '../ui/ModePicker'
-import type { Mode } from '../types/navmap'
-
-const MODE_KEYS: Record<string, Mode> = {
-  '1': 'view',
-  '2': 'poi',
-  '3': 'waypoint',
-  '4': 'edge',
-  '5': 'select',
-  '6': 'measure',
-  '7': 'anchor',
-  '8': 'connect-floors',
-  '9': 'person',
-}
-
-function isTypingTarget(el: EventTarget | null): boolean {
-  if (!(el instanceof HTMLElement)) return false
-  const tag = el.tagName
-  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable
-}
+import { MODE_KEYS, MODE_LABELS } from '../ui/modes'
+import { keyGoesToField } from '../lib/keyboard'
 
 export function useKeyboardShortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (isTypingTarget(e.target)) return
-      const m = MODE_KEYS[e.key]
+      if (keyGoesToField(e.target, e.key)) return
+      const m = MODE_KEYS[e.key.length === 1 ? e.key.toLowerCase() : e.key]
       if (m) {
         const { setMode, setStatus } = useNavmapStore.getState()
         setMode(m)
@@ -61,6 +43,12 @@ export function useKeyboardShortcuts() {
           s.setStatus('Conexión entre pisos cancelada.')
         } else if (s.editingNode) {
           s.cancelEdit()
+        } else if (s.wallStart) {
+          s.cancelWall()
+          s.setStatus('Pared cancelada.')
+        } else if (s.sightPoint) {
+          s.setSightPoint(null)
+          s.setStatus('Simulación de visibilidad limpiada.')
         } else if (s.pendingPoint) {
           s.setPendingPoint(null)
         } else if (s.measurePoints.length > 0) {

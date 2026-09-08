@@ -1,6 +1,8 @@
 import { Canvas } from '@react-three/fiber'
 import { PointCloud } from './PointCloud'
 import { FloorPlane } from './FloorPlane'
+import { WallsLayer } from './WallsLayer'
+import { SightLayer } from './SightLayer'
 import { MarkersLayer } from './MarkersLayer'
 import { PlacementController } from './PlacementController'
 import { HoverTracker } from './HoverTracker'
@@ -32,7 +34,9 @@ export function Scene() {
       <group name="scene-mirror" scale={[sx, sy, sz]}>
         <PointCloud />
         <FloorPlane />
+        <WallsLayer />
         <MarkersLayer />
+        <SightLayer />
         <MeasureLayer />
       </group>
       <PlacementController />

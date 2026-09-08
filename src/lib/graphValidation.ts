@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { colmapToViewer } from './coordTransforms'
+import { wallsBlockLine, wallsToLines } from './walls'
 import { connectionCost } from './routing'
 import type {
   AnchorPoint,
@@ -9,6 +10,7 @@ import type {
   POI,
   RoutingProfiles,
   Transform,
+  WallSegment,
   Waypoint,
 } from '../types/navmap'
 
@@ -29,6 +31,8 @@ export interface ValidationInput {
   metersPerViewerUnit: number | null
   modelRadius: number
   pointCloudGeometry: THREE.BufferGeometry | null
+  /** Paredes marcadas a mano en este piso. Sin ninguna, no hay nada que cruzar. */
+  walls: WallSegment[]
 }
 
 interface GraphNode {
@@ -274,50 +278,26 @@ function countComponents(nodes: GraphNode[], edges: Edge[]): number {
 }
 
 /**
- * Heuristic wall detection: project the cloud points that sit in a "body
- * height" band above the floor onto an XZ occupancy grid, then walk each edge
- * and flag it when consecutive samples cross occupied cells. Open hallways
- * are mostly empty at chest height; walls are dense slabs.
+ * Flags edges that cut through a wall.
+ *
+ * Sólo mira las paredes marcadas a mano: son el único dato de dónde hay muros. Sin paredes
+ * marcadas no se reporta nada, que es lo correcto — no hay con qué contestar la pregunta.
+ *
+ * Acá cuentan también las barandas: no tapan la vista, pero no se atraviesan caminando, y eso
+ * es justo lo que valida esta función.
  */
 function findEdgesThroughWalls(
   input: ValidationInput,
   byId: Map<string, GraphNode>,
 ): Edge[] {
-  const geo = input.pointCloudGeometry
-  if (!geo || input.edges.length === 0) return []
-  const posAttr = geo.attributes.position
-  if (!posAttr) return []
-  const pos = posAttr.array as Float32Array
-  const count = posAttr.count
+  if (input.edges.length === 0 || input.walls.length === 0) return []
 
-  const r = Math.max(1, input.modelRadius)
-  // band in viewer units: 0.3–1.8 m above the floor when calibrated, else a fraction of the model size
   const mpvu = input.metersPerViewerUnit
-  const bandLo = input.floorHeightViewer + (mpvu ? 0.3 / mpvu : r * 0.04)
-  const bandHi = input.floorHeightViewer + (mpvu ? 1.8 / mpvu : r * 0.25)
-  const cell = mpvu ? 0.25 / mpvu : r * 0.02
+  // Un nodo marcado contra su pared —una puerta, un aula— es el caso normal: se ignoran 0,6 m
+  // en cada extremo, igual que en la app.
+  const clearance = mpvu ? 0.6 / mpvu : Math.max(1, input.modelRadius) * 0.05
 
-  const grid = new Map<number, number>()
-  const keyOf = (x: number, z: number) =>
-    Math.floor((x + r * 4) / cell) * 100000 + Math.floor((z + r * 4) / cell)
-  const stride = Math.max(1, Math.floor(count / 400000))
-  let occupied = 0
-  for (let i = 0; i < count; i += stride) {
-    const y = pos[i * 3 + 1]
-    if (y < bandLo || y > bandHi) continue
-    const k = keyOf(pos[i * 3], pos[i * 3 + 2])
-    const c = (grid.get(k) ?? 0) + 1
-    grid.set(k, c)
-    if (c === 1) occupied++
-  }
-  if (occupied < 20) return []
-
-  // adaptive density threshold: a wall cell should hold a decent share of the typical occupied cell
-  const cellCounts = [...grid.values()].sort((a, b) => a - b)
-  const median = cellCounts[Math.floor(cellCounts.length / 2)]
-  const minPts = Math.max(3, Math.round(median * 0.5))
-
-  const endpointClearance = mpvu ? 0.6 / mpvu : r * 0.05
+  const lines = wallsToLines(input.walls, input.transform)
   const suspect: Edge[] = []
   for (const e of input.edges) {
     const a = byId.get(e.from)
@@ -325,25 +305,7 @@ function findEdgesThroughWalls(
     if (!a || !b) continue
     const va = colmapToViewer(a.x, a.y, a.z, input.transform)
     const vb = colmapToViewer(b.x, b.y, b.z, input.transform)
-    const len = Math.hypot(vb.vx - va.vx, vb.vz - va.vz)
-    if (len < endpointClearance * 2.5) continue
-    const steps = Math.max(4, Math.ceil(len / (cell * 0.8)))
-    let run = 0
-    let hit = false
-    for (let s = 0; s <= steps && !hit; s++) {
-      const t = s / steps
-      const d = t * len
-      if (d < endpointClearance || len - d < endpointClearance) {
-        run = 0
-        continue
-      }
-      const x = va.vx + (vb.vx - va.vx) * t
-      const z = va.vz + (vb.vz - va.vz) * t
-      const n = grid.get(keyOf(x, z)) ?? 0
-      run = n >= minPts ? run + 1 : 0
-      if (run >= 2) hit = true
-    }
-    if (hit) suspect.push(e)
+    if (wallsBlockLine(lines, va.vx, va.vz, vb.vx, vb.vz, clearance, false)) suspect.push(e)
   }
   return suspect
 }
